@@ -5,7 +5,7 @@ import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 require('dotenv').config();
 
-const baseUrl = '/';
+const baseUrl = '/architecture-center-quick-start';
 
 const config: Config = {
     title: 'SAP Architecture Center',
@@ -13,12 +13,12 @@ const config: Config = {
         'SAP Architecture Center empowers architects and developers with best practices, reference architectures, and community-driven guidance for designing, integrating, and optimizing SAP and cloud solutions. Accelerate innovation, ensure security, and reduce costs with proven frameworks and collaborative expertise for enterprise transformation.',
     favicon: 'img/favicon.ico',
 
-    url: 'https://architecture.learning.sap.com',
+    url: 'https://navyakhurana.github.io',
     baseUrl: baseUrl,
 
     // GitHub pages deployment config.
-    organizationName: 'SAP', //GitHub org
-    projectName: 'architecture-center', // repo name
+    organizationName: 'navyakhurana', //GitHub org
+    projectName: 'architecture-center-quick-start', // repo name
     deploymentBranch: 'site',
     trailingSlash: false,
 
