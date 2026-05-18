@@ -35,7 +35,7 @@ const config: Config = {
     customFields: {
         validatorApiUrl: process.env.VALIDATOR_API_URL,
         backendUrl: process.env.BACKEND_API_URL,
-        expressBackendUrl: process.env.EXPRESS_BACKEND_URL,
+        expressBackendUrl: "https://sap-architecture-center-quickstart-cap-port-ij290co9-pr61a3cf31.cfapps.eu10-005.hana.ondemand.com",
         authProviders: {
             '/architecture-validator': 'btp',
             '/quick-start': 'github',
