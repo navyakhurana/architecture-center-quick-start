@@ -1,0 +1,41 @@
+import { useEffect, useState } from 'react';
+import pako from 'pako';
+import { Button } from '@ui5/webcomponents-react';
+
+const HOST_DRAWIO_VIEWER = 'https://app.diagrams.net#R';
+
+// we expect the raw xml string of the drawio file as prop here
+export default function LinkDrawioViewer({ drawioXml }) {
+    const [encodedLink, setEncodedLink] = useState(null);
+
+    useEffect(() => {
+        const p = new DOMParser();
+        const xmlDoc = p.parseFromString(drawioXml, 'text/xml');
+        const serializer = new XMLSerializer();
+        for (const diagram of xmlDoc.querySelectorAll('diagram')) {
+            const enc = encodeDiagramChild(serializer.serializeToString(diagram.firstElementChild));
+            // modifies xml doc inplace, which is what we want
+            diagram.replaceChildren([enc]);
+        }
+
+        const link = HOST_DRAWIO_VIEWER + encodeURIComponent(serializer.serializeToString(xmlDoc));
+        setEncodedLink(link);
+    }, [drawioXml]);
+
+    return (
+        <a href={encodedLink} target="_blank" rel="noopener noreferrer">
+            <Button style={{ width: 150, borderRadius: '24px' }}>Edit</Button>
+        </a>
+    );
+}
+
+// This is the diagram encoding that they use, see https://github.com/jgraph/drawio-tools/blob/master/tools/convert.html#L11
+function encodeDiagramChild(childXml) {
+    // replace different kinds of line breaks
+    let s = childXml.replace(/(\r\n|\n|\r)/gm, '');
+    s = encodeURIComponent(s);
+    // compress data with zlib deflate algorithm, then convert to string
+    s = [...pako.deflateRaw(s)].map((c) => String.fromCodePoint(c)).join('');
+    // base64 encode
+    return btoa(s);
+}
