@@ -94,6 +94,10 @@ jobs:
         with:
           path: __build__
 
+      - name: Set up Git
+        run: |
+          git config --global user.email "navya.khurana@sap.com"
+          git config --global user.name "navyakhurana"
 
       - name: Switch to Pages Branch
         run: |
