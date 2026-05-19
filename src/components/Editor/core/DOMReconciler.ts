@@ -476,7 +476,9 @@ export class DOMReconciler {
       iframe.style.height = '200px';
       iframe.style.border = 'none';
       iframe.style.borderRadius = '8px';
-      iframe.srcdoc = this.createLoadingPlaceholder('image');
+      // If has assetId, it's loading from backend; otherwise saving new upload
+      const mode = node.assetId ? 'loading' : 'saving';
+      iframe.srcdoc = this.createLoadingPlaceholder('image', mode);
       wrapper.appendChild(iframe);
       return wrapper;
     }
@@ -527,7 +529,9 @@ export class DOMReconciler {
     } else {
       // Show animated folder loading placeholder - add loading class to remove border
       wrapper.classList.add('editorDrawioLoading');
-      iframe.srcdoc = this.createLoadingPlaceholder('diagram');
+      // If has assetId, it's loading from backend; otherwise saving new upload
+      const mode = node.assetId ? 'loading' : 'saving';
+      iframe.srcdoc = this.createLoadingPlaceholder('diagram', mode);
     }
 
     // Add invisible overlay for mouse event handling (allows drag detection)
@@ -635,8 +639,9 @@ export class DOMReconciler {
 </html>`;
   }
 
-  private createLoadingPlaceholder(type: 'diagram' | 'image'): string {
-    const label = type === 'diagram' ? 'Loading diagram' : 'Loading image';
+  private createLoadingPlaceholder(type: 'diagram' | 'image', mode: 'saving' | 'loading' = 'saving'): string {
+    const action = mode === 'saving' ? 'Saving' : 'Loading';
+    const label = type === 'diagram' ? `${action} diagram` : `${action} image`;
     return `<!DOCTYPE html>
 <html style="height: 100%;">
 <head>
@@ -924,9 +929,46 @@ export class DOMReconciler {
     addColBtn.setAttribute('data-table-key', node.key);
     addColBtn.setAttribute('data-action', 'add-col');
 
-    wrapper.appendChild(table);
-    wrapper.appendChild(addRowBtn);
-    wrapper.appendChild(addColBtn);
+    // Inner container for table + buttons (for proper positioning)
+    const tableContainer = document.createElement('div');
+    tableContainer.className = 'editorTableContainer';
+    tableContainer.appendChild(table);
+    tableContainer.appendChild(addRowBtn);
+    tableContainer.appendChild(addColBtn);
+
+    wrapper.appendChild(tableContainer);
+
+    // Position buttons and check overflow
+    const updateButtonPositions = () => {
+      const editorContainer = wrapper.closest('.editorContainer');
+      const tableHeight = table.offsetHeight;
+      const tableWidth = table.offsetWidth;
+
+      // Center the add column button vertically based on actual table height
+      addColBtn.style.top = `${tableHeight / 2}px`;
+
+      // Center the add row button horizontally based on actual table width
+      addRowBtn.style.left = `${tableWidth / 2}px`;
+
+      // Hide add column button if table would overflow editor
+      if (editorContainer) {
+        const editorWidth = editorContainer.clientWidth;
+        const minColWidth = 100;
+        if (tableWidth + minColWidth > editorWidth - 40) {
+          addColBtn.style.display = 'none';
+        } else {
+          addColBtn.style.display = '';
+        }
+      }
+    };
+
+    // Check on initial render and observe for changes
+    requestAnimationFrame(updateButtonPositions);
+    const resizeObserver = new ResizeObserver(updateButtonPositions);
+    resizeObserver.observe(table);
+
+    // Store observer reference for cleanup
+    (wrapper as any)._resizeObserver = resizeObserver;
 
     return wrapper;
   }

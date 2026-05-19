@@ -10,29 +10,24 @@ const formatDate = (timestamp: string | null | undefined): string => {
     if (!timestamp) return 'N/A';
 
     try {
-        const datePart = timestamp.split(',')[0];
-
-        const parts = datePart.split('/');
-
-        if (parts.length !== 3) {
-            return datePart;
-        }
-
-        const [day, month, year] = parts;
-
-        const date = new Date(Number(year), Number(month) - 1, Number(day));
+        // Parse ISO date string or existing Date
+        const date = new Date(timestamp);
 
         if (isNaN(date.getTime())) {
-            return datePart;
+            return timestamp;
         }
 
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
+        // Format: DD/MM/YYYY, HH:MM:SS
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+
+        return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
     } catch {
-        return timestamp.split(',')[0];
+        return timestamp;
     }
 };
 

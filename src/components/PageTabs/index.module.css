@@ -1,5 +1,4 @@
 .navContainer {
-    border-right: 1px solid var(--ifm-color-emphasis-300);
     padding: 0.5rem;
     display: flex;
     flex-direction: column;
@@ -9,7 +8,7 @@
 .newRefArchButton {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
     width: 100%;
     padding: 12px 14px;
     margin-bottom: 12px;
@@ -105,8 +104,26 @@
     flex-shrink: 0;
 }
 
-.navItem:hover .itemActions,
-.navItem.active .itemActions {
+.addSubPageButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    flex-shrink: 0;
+}
+
+.addSubPageButton:hover {
+    opacity: 0.8;
+}
+
+.navItem:hover .addSubPageButton,
+.navItem.active .addSubPageButton {
     opacity: 1;
 }
 

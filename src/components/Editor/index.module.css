@@ -605,11 +605,16 @@
 :global(.editorTableWrapper) {
     margin: 1.5rem 0;
     position: relative;
-    display: inline-flex;
-    align-items: flex-start;
-    gap: 4px;
+    display: block;
     max-width: 100%;
-    overflow-x: auto;
+    overflow: visible;
+}
+
+:global(.editorTableContainer) {
+    position: relative;
+    display: block;
+    max-width: 100%;
+    width: fit-content;
 }
 
 :global(.editorTableControls) {
@@ -654,6 +659,7 @@
     border-radius: 8px;
     overflow: hidden;
     table-layout: auto;
+    max-width: 100%;
 }
 
 :global(.editorTableRow) {
@@ -686,8 +692,8 @@
 /* Add row/column buttons */
 :global(.editorTableAddRow) {
     position: absolute;
-    bottom: -12px;
-    left: 50%;
+    bottom: -20px;
+    left: 0;
     transform: translateX(-50%);
     width: 24px;
     height: 24px;
@@ -702,12 +708,13 @@
     transition: opacity 0.2s;
     font-size: 16px;
     color: #6b7280;
+    z-index: 5;
 }
 
 :global(.editorTableAddCol) {
     position: absolute;
-    right: -12px;
-    top: 50%;
+    right: -20px;
+    top: 0;
     transform: translateY(-50%);
     width: 24px;
     height: 24px;
@@ -722,6 +729,7 @@
     transition: opacity 0.2s;
     font-size: 16px;
     color: #6b7280;
+    z-index: 5;
 }
 
 :global(.editorTableWrapper:hover .editorTableAddRow),

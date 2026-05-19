@@ -26,6 +26,7 @@
     line-height: var(--sapContent_LineHeight);
     color: var(--sapTextColor);
     margin: 0 0 1.5rem 0;
+    padding-right: 50px;
     font-family: var(--sapFontHeaderFamily);
     letter-spacing: var(--sapFontHeaderLetterSpacing);
 }

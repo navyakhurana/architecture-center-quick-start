@@ -10,7 +10,8 @@ import { useAuth } from '@site/src/context/AuthContext';
 import Header from '@site/src/components/CustomHeader/Header';
 import { Button, Card, Dialog, FlexBox, Icon, Text, Title } from '@ui5/webcomponents-react';
 import useIsMobile from '@site/src/hooks/useIsMobile';
-import LetterGlitchLoader from '@site/src/components/LetterGlitchLoader';
+import RocketLoader from '@site/src/components/RocketLoader';
+import CircularText from '@site/src/components/CircularText';
 
 function EditorComponent({ onAddNew, onEditMeta }: { onAddNew: (parentId?: string | null) => void; onEditMeta?: () => void }) {
     const activeDocumentId = usePageDataStore((state) => state.activeDocumentId);
@@ -41,7 +42,7 @@ function AuthenticatedQuickStartView() {
     const [isEditMode, setIsEditMode] = useState(false);
     const [newDocData, setNewDocData] = useState<PageMetadata>(initialPageData);
     const [currentParentId, setCurrentParentId] = useState<string | null>(null);
-    const { documents, addDocument, setBackendConfig, fetchDocuments, isLoading, getActiveDocument, updateDocument } = usePageDataStore();
+    const { documents, addDocument, setBackendConfig, fetchDocuments, isLoading, isCreating, getActiveDocument, updateDocument } = usePageDataStore();
     const history = useHistory();
     const { siteConfig } = useDocusaurusContext();
     const baseUrl = siteConfig.baseUrl;
@@ -117,8 +118,22 @@ function AuthenticatedQuickStartView() {
         setIsModalOpen(false);
     };
 
+    // Show initializing screen only on first load (fetching documents)
     if (isLoading || !initialized) {
-        return <LetterGlitchLoader />;
+        return (
+            <div className={styles.initializingContainer}>
+                <CircularText
+                    text="• INITIALIZING • COMMAND • CENTER • INITIALIZING • COMMAND • CENTER "
+                    radius={90}
+                    fontSize={14}
+                />
+            </div>
+        );
+    }
+
+    // Show folder loader when creating a new ref arch
+    if (isCreating) {
+        return <RocketLoader usePuns />;
     }
 
     return (

@@ -32,6 +32,7 @@ interface PageDataState {
     activeDocumentId: string | null;
     openDocumentIds: string[];  // Array of open root document IDs (ref archs)
     isLoading: boolean;
+    isCreating: boolean;  // Separate state for document creation
     isSyncing: boolean;
     syncError: string | null;
     backendUrl: string | null;
@@ -106,6 +107,7 @@ export const usePageDataStore = create<PageDataState>()(
             activeDocumentId: null,
             openDocumentIds: [],
             isLoading: false,
+            isCreating: false,
             isSyncing: false,
             syncError: null,
             backendUrl: null,
@@ -341,7 +343,7 @@ export const usePageDataStore = create<PageDataState>()(
                                 d.id === id ? { ...d, _synced: true, _contributorsDirty: false, _tagsDirty: false } : d
                             ),
                             isSyncing: false,
-                            lastSaveTimestamp: new Date().toLocaleString(),
+                            lastSaveTimestamp: new Date().toISOString(),
                             syncError: null,
                         }));
                     } catch (error) {
@@ -450,7 +452,7 @@ export const usePageDataStore = create<PageDataState>()(
                     return newDocument;
                 }
 
-                set({ isLoading: true, syncError: null });
+                set({ isCreating: true, syncError: null });
 
                 try {
                     const response = await fetch(
@@ -501,8 +503,8 @@ export const usePageDataStore = create<PageDataState>()(
                             documents: [...state.documents, newDocument],
                             activeDocumentId: newDocument.id,
                             openDocumentIds: newOpenIds,
-                            lastSaveTimestamp: new Date().toLocaleString(),
-                            isLoading: false,
+                            lastSaveTimestamp: new Date().toISOString(),
+                            isCreating: false,
                         };
                     });
 
@@ -510,7 +512,7 @@ export const usePageDataStore = create<PageDataState>()(
                 } catch (error) {
                     console.error('Error creating document:', error);
                     set({
-                        isLoading: false,
+                        isCreating: false,
                         syncError: error instanceof Error ? error.message : 'Failed to create document',
                     });
                     return null;

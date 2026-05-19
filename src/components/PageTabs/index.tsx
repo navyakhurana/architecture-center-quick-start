@@ -18,6 +18,7 @@ const PageTabs: React.FC<PageTabsProps> = ({ onAddNew }) => {
 
     const renderDocumentTree = (doc: Document) => {
         const children = documents.filter((child) => child.parentId === doc.id);
+        const canAddSubPage = onAddNew && !doc.isReadOnly;
 
         return (
             <div key={doc.id}>
@@ -30,18 +31,17 @@ const PageTabs: React.FC<PageTabsProps> = ({ onAddNew }) => {
                     <span className={styles.itemTitle} title={doc.title || 'Untitled Page'}>
                         {doc.title || 'Untitled Page'}
                     </span>
-                    {onAddNew && (
-                        <div className={styles.itemActions}>
-                            <Button
-                                design="Transparent"
-                                icon="add"
-                                onClick={(e) => {
-                                    handleActionClick(e);
-                                    onAddNew(doc.id);
-                                }}
-                                tooltip={'Add sub-page'}
-                            />
-                        </div>
+                    {canAddSubPage && (
+                        <button
+                            className={styles.addSubPageButton}
+                            onClick={(e) => {
+                                handleActionClick(e);
+                                onAddNew(doc.id);
+                            }}
+                            title="Add sub-page"
+                        >
+                            <Plus size={18} />
+                        </button>
                     )}
                 </div>
                 {children.length > 0 && (
@@ -65,8 +65,8 @@ const PageTabs: React.FC<PageTabsProps> = ({ onAddNew }) => {
                     onClick={() => onAddNew(null)}
                     title="Create new Reference Architecture"
                 >
-                    <Plus size={18} />
                     <span>New Ref Arch</span>
+                    <Plus size={18} />
                 </button>
             )}
             <div className={styles.documentsList}>
