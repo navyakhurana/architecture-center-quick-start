@@ -544,6 +544,9 @@ export class DOMReconciler {
       return wrapper;
     }
 
+    // Add toolbar with zoom and edit buttons
+    this.addDrawioToolbar(wrapper, node.key, iframe);
+
     // Add invisible overlay for mouse event handling (allows drag detection)
     const overlay = document.createElement('div');
     overlay.className = 'editorDrawioOverlay';
@@ -569,6 +572,62 @@ export class DOMReconciler {
     wrapper.appendChild(iframe);
     wrapper.appendChild(overlay);
     return wrapper;
+  }
+
+  private addDrawioToolbar(wrapper: HTMLElement, nodeKey: string, iframe: HTMLIFrameElement | null): void {
+    // Don't add if already exists
+    if (wrapper.querySelector('.editorDrawioToolbar')) return;
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'editorDrawioToolbar';
+
+    // Zoom in button
+    const zoomInBtn = document.createElement('button');
+    zoomInBtn.className = 'editorDrawioBtn';
+    zoomInBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>';
+    zoomInBtn.title = 'Zoom In';
+    zoomInBtn.onclick = (e) => {
+      e.stopPropagation();
+      const iframeEl = iframe || wrapper.querySelector('iframe');
+      iframeEl?.contentWindow?.postMessage({ type: 'zoom', direction: 'in' }, '*');
+    };
+
+    // Zoom out button
+    const zoomOutBtn = document.createElement('button');
+    zoomOutBtn.className = 'editorDrawioBtn';
+    zoomOutBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>';
+    zoomOutBtn.title = 'Zoom Out';
+    zoomOutBtn.onclick = (e) => {
+      e.stopPropagation();
+      const iframeEl = iframe || wrapper.querySelector('iframe');
+      iframeEl?.contentWindow?.postMessage({ type: 'zoom', direction: 'out' }, '*');
+    };
+
+    // Fit to screen button
+    const fitBtn = document.createElement('button');
+    fitBtn.className = 'editorDrawioBtn';
+    fitBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+    fitBtn.title = 'Fit to Screen';
+    fitBtn.onclick = (e) => {
+      e.stopPropagation();
+      const iframeEl = iframe || wrapper.querySelector('iframe');
+      iframeEl?.contentWindow?.postMessage({ type: 'zoom', direction: 'fit' }, '*');
+    };
+
+    // Edit button - opens draw.io editor
+    const editBtn = document.createElement('button');
+    editBtn.className = 'editorDrawioBtn editorDrawioEditBtn';
+    editBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    editBtn.title = 'Edit Diagram';
+    editBtn.setAttribute('data-node-key', nodeKey);
+
+    toolbar.appendChild(zoomInBtn);
+    toolbar.appendChild(zoomOutBtn);
+    toolbar.appendChild(fitBtn);
+    toolbar.appendChild(editBtn);
+
+    // Insert toolbar as first child
+    wrapper.insertBefore(toolbar, wrapper.firstChild);
   }
 
   private createDrawioSrcdoc(diagramXML: string): string {
@@ -621,6 +680,7 @@ export class DOMReconciler {
         container.appendChild(div);
 
         // Wait for viewer library to load, then initialize
+        var currentScale = 1;
         var initViewer = function() {
           if (typeof GraphViewer !== 'undefined') {
             try {
@@ -639,6 +699,25 @@ export class DOMReconciler {
           }
         };
         initViewer();
+
+        // Listen for zoom messages from parent - use CSS transform
+        window.addEventListener('message', function(event) {
+          if (event.data && event.data.type === 'zoom') {
+            var diagramContainer = document.querySelector('.geDiagramContainer') || document.querySelector('#diagram');
+            if (diagramContainer) {
+              if (event.data.direction === 'in') {
+                currentScale = Math.min(currentScale * 1.25, 3);
+              } else if (event.data.direction === 'out') {
+                currentScale = Math.max(currentScale / 1.25, 0.25);
+              } else if (event.data.direction === 'fit') {
+                currentScale = 1;
+              }
+              diagramContainer.style.transform = 'scale(' + currentScale + ')';
+              diagramContainer.style.transformOrigin = 'top left';
+              setTimeout(resizeIframe, 100);
+            }
+          }
+        });
       } catch (e) {
         document.getElementById('diagram').innerHTML = '<div class="error">Error loading diagram: ' + e.message + '</div>';
         console.error('Drawio render error:', e);
@@ -969,6 +1048,12 @@ export class DOMReconciler {
     if (node.type === 'drawio') {
       const drawioNode = node as DrawioNode;
 
+      // Check if toolbar exists, if not add it
+      if (!element.querySelector('.editorDrawioToolbar') && drawioNode.diagramXML) {
+        const iframe = element.querySelector('iframe') as HTMLIFrameElement;
+        this.addDrawioToolbar(element, drawioNode.key, iframe);
+      }
+
       // Check if we're updating from loading state (placeholder div) to actual diagram
       const placeholder = element.querySelector('.editorMediaPlaceholder');
       if (placeholder && drawioNode.diagramXML) {
@@ -986,6 +1071,9 @@ export class DOMReconciler {
         iframe.width = '100%';
         iframe.style.height = '400px';
         iframe.srcdoc = this.createDrawioSrcdoc(drawioNode.diagramXML);
+
+        // Add toolbar
+        this.addDrawioToolbar(element, drawioNode.key, iframe);
 
         // Insert iframe before the overlay (if exists)
         const overlay = element.querySelector('.editorDrawioOverlay');

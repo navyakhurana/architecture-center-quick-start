@@ -16,6 +16,7 @@ import TableMenuPlugin from './plugins/TableMenuPlugin';
 import TableOfContentsPlugin from './plugins/TableOfContentsPlugin';
 import LinkPreviewPlugin from './plugins/LinkPreviewPlugin';
 import MediaLoadingPlugin from './plugins/MediaLoadingPlugin';
+import DrawioEditorPlugin from './plugins/DrawioEditorPlugin';
 import { convertToLexicalFormat } from './utils/convertToLexical';
 import { getApiService } from '@site/src/services/api';
 import styles from './index.module.css';
@@ -109,6 +110,7 @@ function EditorContent({ containerRef, readOnly }: EditorContentProps) {
           <BlockHandlePlugin />
           <TableMenuPlugin />
           <LinkPreviewPlugin />
+          <DrawioEditorPlugin />
         </>
       )}
     </div>
@@ -610,9 +612,10 @@ const Editor: React.FC<EditorProps> = ({ onAddNew, onEditMeta }) => {
                     View Only - You are a contributor
                   </span>
                 )}
-                {!isReadOnly && lastSaveTimestamp && (
+                {!isReadOnly && (
                   <span className={styles.saveTimestamp}>
-                    {isSyncing ? 'Saving...' : syncError ? `Error: ${syncError}` : `Last saved: ${formatTimestamp(lastSaveTimestamp)}`}
+                    <span className={`${styles.statusDot} ${isSyncing ? styles.statusSaving : syncError ? styles.statusError : styles.statusSaved}`}></span>
+                    {isSyncing ? 'Saving...' : syncError ? `Error: ${syncError}` : 'Saved'}
                   </span>
                 )}
                 {!isReadOnly && (

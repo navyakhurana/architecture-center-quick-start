@@ -138,6 +138,38 @@
     margin-right: auto;
     font-size: 12px;
     color: #6c757d;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.statusDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.statusSaving {
+    background-color: #f59e0b;
+    animation: pulse 1s infinite;
+}
+
+.statusSaved {
+    background-color: #22c55e;
+}
+
+.statusError {
+    background-color: #ef4444;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
 }
 
 .headerButtons {
@@ -1022,4 +1054,72 @@
 :root[data-theme='dark'] :global(.editorMediaPlaceholder) {
     background-color: #1f2937;
     border-color: #374151;
+}
+
+/* Drawio toolbar */
+:global(.editorDrawioToolbar) {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+:global(.editorDrawioWrapper:hover) :global(.editorDrawioToolbar) {
+    opacity: 1;
+}
+
+:global(.editorDrawioBtn) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 4px;
+    background-color: #ffffff;
+    color: #374151;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+:global(.editorDrawioBtn:hover) {
+    background-color: #f3f4f6;
+    transform: scale(1.05);
+}
+
+:global(.editorDrawioBtn:active) {
+    transform: scale(0.95);
+}
+
+:global(.editorDrawioEditBtn) {
+    background-color: #0a6ed1;
+    color: #ffffff;
+}
+
+:global(.editorDrawioEditBtn:hover) {
+    background-color: #0854a0;
+}
+
+:root[data-theme='dark'] :global(.editorDrawioBtn) {
+    background-color: #374151;
+    color: #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme='dark'] :global(.editorDrawioBtn:hover) {
+    background-color: #4b5563;
+}
+
+:root[data-theme='dark'] :global(.editorDrawioEditBtn) {
+    background-color: #0a6ed1;
+    color: #ffffff;
+}
+
+:root[data-theme='dark'] :global(.editorDrawioEditBtn:hover) {
+    background-color: #0854a0;
 }
