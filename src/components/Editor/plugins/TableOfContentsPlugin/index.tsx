@@ -91,23 +91,17 @@ export default function TableOfContentsPlugin() {
   return (
     <div className={styles.tocContainer}>
       <ul className={styles.tocList}>
-        {headings.length > 0 ? (
-          headings.map((heading) => (
-            <li
-              key={heading.key}
-              className={`${styles.tocItem} ${heading.key === activeKey ? styles.active : ''}`}
-              data-level={Math.max(1, heading.level - 1)}
-              onClick={() => handleClick(heading.key)}
-              title={heading.text}
-            >
-              {heading.text}
-            </li>
-          ))
-        ) : (
-          <li className={styles.tocItem} data-level="1">
-            No headings yet.
+        {headings.map((heading) => (
+          <li
+            key={heading.key}
+            className={`${styles.tocItem} ${heading.key === activeKey ? styles.active : ''}`}
+            data-level={Math.max(1, heading.level - 1)}
+            onClick={() => handleClick(heading.key)}
+            title={heading.text}
+          >
+            {heading.text}
           </li>
-        )}
+        ))}
       </ul>
     </div>
   );

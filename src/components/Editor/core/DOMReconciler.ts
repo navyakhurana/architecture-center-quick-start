@@ -469,17 +469,16 @@ export class DOMReconciler {
     wrapper.setAttribute('contenteditable', 'false');
     wrapper.className = 'editorImageWrapper';
 
-    // Show loading animation if no src yet
+    // Show loading placeholder if no src yet
     if (!node.src) {
-      const iframe = document.createElement('iframe');
-      iframe.style.width = '100%';
-      iframe.style.height = '200px';
-      iframe.style.border = 'none';
-      iframe.style.borderRadius = '8px';
-      // If has assetId, it's loading from backend; otherwise saving new upload
       const mode = node.assetId ? 'loading' : 'saving';
-      iframe.srcdoc = this.createLoadingPlaceholder('image', mode);
-      wrapper.appendChild(iframe);
+      const label = mode === 'saving' ? 'Saving image' : 'Loading image';
+      const placeholder = document.createElement('div');
+      placeholder.className = 'editorMediaPlaceholder';
+      placeholder.setAttribute('data-loading-type', 'image');
+      placeholder.setAttribute('data-loading-mode', mode);
+      placeholder.setAttribute('data-loading-label', label);
+      wrapper.appendChild(placeholder);
       return wrapper;
     }
 
@@ -527,11 +526,22 @@ export class DOMReconciler {
       wrapper.setAttribute('data-diagram-xml', node.diagramXML);
       iframe.srcdoc = this.createDrawioSrcdoc(node.diagramXML);
     } else {
-      // Show animated folder loading placeholder - add loading class to remove border
+      // Show loading placeholder - add loading class to remove border
       wrapper.classList.add('editorDrawioLoading');
-      // If has assetId, it's loading from backend; otherwise saving new upload
       const mode = node.assetId ? 'loading' : 'saving';
-      iframe.srcdoc = this.createLoadingPlaceholder('diagram', mode);
+      const label = mode === 'saving' ? 'Saving diagram' : 'Loading diagram';
+      const placeholder = document.createElement('div');
+      placeholder.className = 'editorMediaPlaceholder';
+      placeholder.setAttribute('data-loading-type', 'diagram');
+      placeholder.setAttribute('data-loading-mode', mode);
+      placeholder.setAttribute('data-loading-label', label);
+      wrapper.appendChild(placeholder);
+      // Don't add iframe when showing placeholder
+      // Add invisible overlay for mouse event handling (allows drag detection)
+      const overlay = document.createElement('div');
+      overlay.className = 'editorDrawioOverlay';
+      wrapper.appendChild(overlay);
+      return wrapper;
     }
 
     // Add invisible overlay for mouse event handling (allows drag detection)
@@ -642,6 +652,7 @@ export class DOMReconciler {
   private createLoadingPlaceholder(type: 'diagram' | 'image', mode: 'saving' | 'loading' = 'saving'): string {
     const action = mode === 'saving' ? 'Saving' : 'Loading';
     const label = type === 'diagram' ? `${action} diagram` : `${action} image`;
+    // SAP UI5 BusyIndicator style - 5 animated dots
     return `<!DOCTYPE html>
 <html style="height: 100%;">
 <head>
@@ -658,116 +669,64 @@ export class DOMReconciler {
       justify-content: center;
       margin: 0;
       background: transparent;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: '72', '72full', Arial, Helvetica, sans-serif;
     }
-    .loader {
+    .busy-indicator {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 20px;
+      gap: 12px;
     }
-    .folder {
-      --folder-color: #6366f1;
-      --paper-color: #fff;
-      position: relative;
-      width: 80px;
-      height: 60px;
-      perspective: 300px;
+    .busy-indicator-dots {
+      display: flex;
+      gap: 6px;
     }
-    .folder-back {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background: var(--folder-color);
-      border-radius: 0 8px 8px 8px;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    .busy-indicator-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: #0a6ed1;
+      animation: ui5-busy-indicator 1.4s infinite ease-in-out both;
     }
-    .folder-back::before {
-      content: '';
-      position: absolute;
-      top: -10px;
-      left: 0;
-      width: 35px;
-      height: 10px;
-      background: var(--folder-color);
-      border-radius: 4px 4px 0 0;
+    .busy-indicator-dot:nth-child(1) { animation-delay: -0.32s; }
+    .busy-indicator-dot:nth-child(2) { animation-delay: -0.16s; }
+    .busy-indicator-dot:nth-child(3) { animation-delay: 0s; }
+    .busy-indicator-dot:nth-child(4) { animation-delay: 0.16s; }
+    .busy-indicator-dot:nth-child(5) { animation-delay: 0.32s; }
+    @keyframes ui5-busy-indicator {
+      0%, 80%, 100% {
+        transform: scale(0.4);
+        opacity: 0.3;
+      }
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
     }
-    .paper {
-      position: absolute;
-      width: 50px;
-      height: 40px;
-      background: var(--paper-color);
-      border-radius: 4px;
-      left: 50%;
-      transform: translateX(-50%);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .paper:nth-child(2) {
-      bottom: 20px;
-      animation: paper1 1.5s ease-in-out infinite;
-    }
-    .paper:nth-child(3) {
-      bottom: 16px;
-      animation: paper2 1.5s ease-in-out infinite 0.1s;
-    }
-    .paper:nth-child(4) {
-      bottom: 12px;
-      animation: paper3 1.5s ease-in-out infinite 0.2s;
-    }
-    .folder-front {
-      position: absolute;
-      width: 100%;
-      height: 50%;
-      bottom: 0;
-      background: linear-gradient(180deg, #818cf8 0%, var(--folder-color) 100%);
-      border-radius: 0 0 8px 8px;
-      transform-origin: bottom center;
-      animation: fold 1.5s ease-in-out infinite;
-    }
-    @keyframes fold {
-      0%, 100% { transform: rotateX(0deg); }
-      50% { transform: rotateX(-35deg); }
-    }
-    @keyframes paper1 {
-      0%, 100% { transform: translateX(-50%) translateY(0); }
-      50% { transform: translateX(-50%) translateY(-15px); }
-    }
-    @keyframes paper2 {
-      0%, 100% { transform: translateX(-50%) translateY(0); }
-      50% { transform: translateX(-50%) translateY(-12px); }
-    }
-    @keyframes paper3 {
-      0%, 100% { transform: translateX(-50%) translateY(0); }
-      50% { transform: translateX(-50%) translateY(-9px); }
-    }
-    .label {
-      color: #64748b;
+    .busy-indicator-text {
+      color: #32363a;
       font-size: 14px;
-      font-weight: 500;
     }
-    .dots::after {
-      content: '';
-      animation: dots 1.5s steps(4, end) infinite;
-    }
-    @keyframes dots {
-      0% { content: ''; }
-      25% { content: '.'; }
-      50% { content: '..'; }
-      75% { content: '...'; }
-      100% { content: ''; }
+    @media (prefers-color-scheme: dark) {
+      .busy-indicator-dot {
+        background-color: #91c8f6;
+      }
+      .busy-indicator-text {
+        color: #d1d5db;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="loader">
-    <div class="folder">
-      <div class="folder-back"></div>
-      <div class="paper"></div>
-      <div class="paper"></div>
-      <div class="paper"></div>
-      <div class="folder-front"></div>
+  <div class="busy-indicator">
+    <div class="busy-indicator-dots">
+      <div class="busy-indicator-dot"></div>
+      <div class="busy-indicator-dot"></div>
+      <div class="busy-indicator-dot"></div>
+      <div class="busy-indicator-dot"></div>
+      <div class="busy-indicator-dot"></div>
     </div>
-    <div class="label">${label}<span class="dots"></span></div>
+    <div class="busy-indicator-text">${label}...</div>
   </div>
 </body>
 </html>`;
@@ -983,10 +942,10 @@ export class DOMReconciler {
     if (node.type === 'image') {
       const imageNode = node as ImageNode;
 
-      // Check if we're updating from loading state (iframe) to actual image
-      const iframe = element.querySelector('iframe');
-      if (iframe && imageNode.src) {
-        // Replace iframe with actual image
+      // Check if we're updating from loading state (placeholder div) to actual image
+      const placeholder = element.querySelector('.editorMediaPlaceholder');
+      if (placeholder && imageNode.src) {
+        // Replace placeholder with actual image
         element.innerHTML = '';
         const img = document.createElement('img');
         img.src = imageNode.src;
@@ -1009,6 +968,35 @@ export class DOMReconciler {
     // Handle drawio node updates (for lazy-loaded assets)
     if (node.type === 'drawio') {
       const drawioNode = node as DrawioNode;
+
+      // Check if we're updating from loading state (placeholder div) to actual diagram
+      const placeholder = element.querySelector('.editorMediaPlaceholder');
+      if (placeholder && drawioNode.diagramXML) {
+        // Remove loading class and placeholder
+        element.classList.remove('editorDrawioLoading');
+        placeholder.remove();
+
+        // Store XML in data attribute
+        element.setAttribute('data-diagram-xml', drawioNode.diagramXML);
+
+        // Create iframe for the diagram
+        const iframe = document.createElement('iframe');
+        iframe.className = 'editorDrawioIframe';
+        iframe.frameBorder = '0';
+        iframe.width = '100%';
+        iframe.style.height = '400px';
+        iframe.srcdoc = this.createDrawioSrcdoc(drawioNode.diagramXML);
+
+        // Insert iframe before the overlay (if exists)
+        const overlay = element.querySelector('.editorDrawioOverlay');
+        if (overlay) {
+          element.insertBefore(iframe, overlay);
+        } else {
+          element.appendChild(iframe);
+        }
+        return;
+      }
+
       const iframe = element.querySelector('iframe') as HTMLIFrameElement;
       if (iframe && drawioNode.diagramXML) {
         // Remove loading class now that content is loaded

@@ -8,10 +8,8 @@ import { usePageDataStore, PageMetadata } from '@site/src/store/pageDataStore';
 import MetadataFormDialog from '@site/src/components/MetaFormDialog';
 import { useAuth } from '@site/src/context/AuthContext';
 import Header from '@site/src/components/CustomHeader/Header';
-import { Button, Card, Dialog, FlexBox, Icon, Text, Title } from '@ui5/webcomponents-react';
+import { BusyIndicator, Button, Card, Dialog, FlexBox, Icon, Text, Title } from '@ui5/webcomponents-react';
 import useIsMobile from '@site/src/hooks/useIsMobile';
-import RocketLoader from '@site/src/components/RocketLoader';
-import CircularText from '@site/src/components/CircularText';
 
 function EditorComponent({ onAddNew, onEditMeta }: { onAddNew: (parentId?: string | null) => void; onEditMeta?: () => void }) {
     const activeDocumentId = usePageDataStore((state) => state.activeDocumentId);
@@ -122,18 +120,18 @@ function AuthenticatedQuickStartView() {
     if (isLoading || !initialized) {
         return (
             <div className={styles.initializingContainer}>
-                <CircularText
-                    text="• INITIALIZING • COMMAND • CENTER • INITIALIZING • COMMAND • CENTER "
-                    radius={90}
-                    fontSize={14}
-                />
+                <BusyIndicator active size="L" text="Initializing Command Center..." />
             </div>
         );
     }
 
-    // Show folder loader when creating a new ref arch
+    // Show loader when creating a new ref arch
     if (isCreating) {
-        return <RocketLoader usePuns />;
+        return (
+            <div className={styles.initializingContainer}>
+                <BusyIndicator active size="L" text="Creating Reference Architecture..." />
+            </div>
+        );
     }
 
     return (

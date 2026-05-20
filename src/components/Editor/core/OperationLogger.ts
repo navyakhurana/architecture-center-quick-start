@@ -6,10 +6,25 @@ export class OperationLogger {
   private onFlush: (ops: Operation[]) => void;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushDebounceMs: number;
+  private unsyncedNodeKeys: Set<string> = new Set();
+  private onUnsyncedChange?: (nodeKeys: Set<string>) => void;
 
   constructor(onFlush: (ops: Operation[]) => void, debounceMs = 1000) {
     this.onFlush = onFlush;
     this.flushDebounceMs = debounceMs;
+  }
+
+  setUnsyncedChangeCallback(callback: (nodeKeys: Set<string>) => void): void {
+    this.onUnsyncedChange = callback;
+  }
+
+  getUnsyncedNodeKeys(): Set<string> {
+    return new Set(this.unsyncedNodeKeys);
+  }
+
+  private addUnsyncedNode(nodeKey: string): void {
+    this.unsyncedNodeKeys.add(nodeKey);
+    this.onUnsyncedChange?.(this.unsyncedNodeKeys);
   }
 
   log(type: OperationType, nodeKey: string, payload: unknown): void {
@@ -22,6 +37,7 @@ export class OperationLogger {
     };
 
     this.operations.push(op);
+    this.addUnsyncedNode(nodeKey);
     this.scheduleFlush();
   }
 
@@ -36,6 +52,7 @@ export class OperationLogger {
       if (lastPayload.offset + lastPayload.text.length === offset) {
         lastPayload.text += text;
         lastOp.timestamp = Date.now();
+        this.addUnsyncedNode(nodeKey);
         this.scheduleFlush();
         return;
       }
@@ -56,6 +73,7 @@ export class OperationLogger {
         lastPayload.offset = offset;
         lastPayload.length += length;
         lastOp.timestamp = Date.now();
+        this.addUnsyncedNode(nodeKey);
         this.scheduleFlush();
         return;
       }
@@ -97,6 +115,19 @@ export class OperationLogger {
 
   markSynced(lastOpId: string): void {
     this.lastSyncedOpId = lastOpId;
+
+    // Clear unsynced node keys for operations that have been synced
+    const syncedIdx = this.operations.findIndex(op => op.id === lastOpId);
+    if (syncedIdx >= 0) {
+      // Get node keys still unsynced (after the synced operation)
+      const stillUnsynced = new Set<string>();
+      for (let i = syncedIdx + 1; i < this.operations.length; i++) {
+        stillUnsynced.add(this.operations[i].nodeKey);
+      }
+      this.unsyncedNodeKeys = stillUnsynced;
+      this.onUnsyncedChange?.(this.unsyncedNodeKeys);
+    }
+
     if (this.operations.length > 100) {
       const idx = this.operations.findIndex(op => op.id === lastOpId);
       if (idx > 50) {
@@ -122,6 +153,8 @@ export class OperationLogger {
   clear(): void {
     this.operations = [];
     this.lastSyncedOpId = null;
+    this.unsyncedNodeKeys.clear();
+    this.onUnsyncedChange?.(this.unsyncedNodeKeys);
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
