@@ -16,6 +16,7 @@ export interface Document extends PageMetadata {
     editorState: string | null;
     parentId: string | null;
     children?: Document[];
+    updatedAt?: string | null;
     // Remote sync status
     _synced?: boolean;
     _remoteId?: string;
@@ -82,6 +83,46 @@ const safeLocalStorage: StateStorage = {
         localStorage.removeItem(key);
     },
 };
+
+// Throttled storage to reduce localStorage writes - writes at most every 2 seconds
+let pendingWrite: { key: string; value: string } | null = null;
+let writeTimeout: NodeJS.Timeout | null = null;
+const STORAGE_THROTTLE_MS = 2000;
+
+const throttledLocalStorage: StateStorage = {
+    getItem: (key) => safeLocalStorage.getItem(key),
+    setItem: (key, value) => {
+        pendingWrite = { key, value };
+
+        if (!writeTimeout) {
+            writeTimeout = setTimeout(() => {
+                if (pendingWrite) {
+                    safeLocalStorage.setItem(pendingWrite.key, pendingWrite.value);
+                    pendingWrite = null;
+                }
+                writeTimeout = null;
+            }, STORAGE_THROTTLE_MS);
+        }
+    },
+    removeItem: (key) => safeLocalStorage.removeItem(key),
+};
+
+// Flush pending writes immediately (call before page unload)
+const flushPendingWrites = () => {
+    if (pendingWrite) {
+        safeLocalStorage.setItem(pendingWrite.key, pendingWrite.value);
+        pendingWrite = null;
+    }
+    if (writeTimeout) {
+        clearTimeout(writeTimeout);
+        writeTimeout = null;
+    }
+};
+
+// Add beforeunload handler to flush writes
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', flushPendingWrites);
+}
 
 const findDocumentById = (docs: Document[], id: string | null): Document | null => {
     if (!id) return null;
@@ -188,7 +229,7 @@ export const usePageDataStore = create<PageDataState>()(
 
             // Fetch all documents from remote
             fetchDocuments: async () => {
-                const { backendUrl, authToken, currentUsername } = get();
+                const { backendUrl, authToken, currentUsername, documents: localDocuments } = get();
                 console.log('[PageDataStore] fetchDocuments called:', { backendUrl, hasToken: !!authToken, currentUsername });
                 if (!backendUrl || !authToken) {
                     console.warn('[PageDataStore] Backend not configured, skipping fetch');
@@ -234,14 +275,64 @@ export const usePageDataStore = create<PageDataState>()(
                             contributors: doc.contributors?.map((c: any) => c.user?.username).filter(Boolean) || [],
                             tags: doc.tags?.map((t: any) => t.tag?.code).filter(Boolean) || [],
                             isReadOnly: !isAuthor,
+                            updatedAt: doc.modifiedAt || doc.createdAt || null,
                         };
                     });
 
+                    // Merge local unsynced changes with remote data
+                    const mergedDocuments = remoteDocuments.map(remoteDoc => {
+                        const localDoc = localDocuments.find(d => d.id === remoteDoc.id);
+                        // If local doc has unsynced changes (editorState differs), prefer local
+                        if (localDoc && !localDoc._synced && localDoc.editorState) {
+                            console.log('[PageDataStore] Preserving local changes for document:', remoteDoc.id);
+                            return {
+                                ...remoteDoc,
+                                editorState: localDoc.editorState,
+                                _synced: false, // Mark for sync
+                            };
+                        }
+                        return remoteDoc;
+                    });
+
+                    // Also sync any preserved local changes to backend
+                    const unsyncedDocs = mergedDocuments.filter(d => !d._synced);
+                    if (unsyncedDocs.length > 0) {
+                        console.log('[PageDataStore] Syncing', unsyncedDocs.length, 'locally modified documents to backend');
+                        // Sync in background without blocking
+                        unsyncedDocs.forEach(doc => {
+                            fetch(
+                                `${backendUrl}/quickstart/document-service/Documents(${doc.id})`,
+                                {
+                                    method: 'PATCH',
+                                    headers: {
+                                        'Authorization': `Bearer ${authToken}`,
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        title: doc.title,
+                                        description: doc.description || null,
+                                        editorState: doc.editorState,
+                                    }),
+                                }
+                            ).then(() => {
+                                console.log('[PageDataStore] Synced local changes for:', doc.id);
+                                set(state => ({
+                                    documents: state.documents.map(d =>
+                                        d.id === doc.id ? { ...d, _synced: true } : d
+                                    )
+                                }));
+                            }).catch(err => {
+                                console.error('[PageDataStore] Failed to sync local changes:', err);
+                            });
+                        });
+                    }
+
                     set({
-                        documents: remoteDocuments,
-                        activeDocumentId: remoteDocuments.length > 0 ? remoteDocuments[0].id : null,
-                        openDocumentIds: remoteDocuments.filter(d => d.parentId === null).slice(0, 1).map(d => d.id),
+                        documents: mergedDocuments,
+                        activeDocumentId: mergedDocuments.length > 0 ? mergedDocuments[0].id : null,
+                        openDocumentIds: mergedDocuments.filter(d => d.parentId === null).slice(0, 1).map(d => d.id),
                         isLoading: false,
+                        lastSaveTimestamp: data.value?.[0]?.modifiedAt || data.value?.[0]?.createdAt || new Date().toISOString(),
                     });
                 } catch (error) {
                     console.error('Error fetching documents:', error);
@@ -618,7 +709,7 @@ export const usePageDataStore = create<PageDataState>()(
         }),
         {
             name: 'docusaurus-editor-content',
-            storage: createJSONStorage(() => safeLocalStorage),
+            storage: createJSONStorage(() => throttledLocalStorage),
             onRehydrateStorage: () => (state) => {
                 if (state) {
                     // Set first document as active if none

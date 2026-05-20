@@ -58,6 +58,9 @@ export default function ArticleHeader({ readOnly = false, onEditMeta }: ArticleH
     const activeDocument = getActiveDocument();
     const globalTagsData = useGlobalData()['docusaurus-tags']['default']['tags'] as Record<string, TagData> | undefined;
 
+    // Use lastSaveTimestamp from store, fallback to document's updatedAt
+    const displayTimestamp = lastSaveTimestamp || activeDocument?.updatedAt || null;
+
     const { availableTags, tagKeyToLabelMap } = useMemo(() => {
         const tagsData = globalTagsData || {};
         if (Object.keys(tagsData).length === 0) {
@@ -190,7 +193,7 @@ export default function ArticleHeader({ readOnly = false, onEditMeta }: ArticleH
                     ))}
             </div>
             <p className={styles.updateInfo}>
-                Last updated on <strong>{formatDate(lastSaveTimestamp)}</strong> by{' '}
+                Last updated on <strong>{formatDate(displayTimestamp)}</strong> by{' '}
                 <strong>{activeDocument.authors.length > 0 ? activeDocument.authors.join(', ') : 'Unknown'}</strong>
             </p>
         </div>
