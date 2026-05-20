@@ -307,6 +307,10 @@ export class EditorCore {
         const updateDrawioPayload = command.payload as { diagramXML: string; assetId?: string };
         this.updateLastDrawio(updateDrawioPayload.diagramXML, updateDrawioPayload.assetId);
         break;
+      case 'UPDATE_DRAWIO_BY_KEY':
+        const updateByKeyPayload = command.payload as { key: string; diagramXML: string };
+        this.updateDrawioByKey(updateByKeyPayload.key, updateByKeyPayload.diagramXML);
+        break;
       case 'INSERT_DIVIDER':
         this.insertDivider();
         break;
@@ -3181,6 +3185,25 @@ export class EditorCore {
         return;
       }
     }
+  }
+
+  private updateDrawioByKey(key: string, diagramXML: string): void {
+    const node = getNode(this.state, key);
+    if (!node || node.type !== 'drawio') return;
+
+    const drawioNode = node as DrawioNode;
+    const updatedNode: DrawioNode = {
+      ...drawioNode,
+      diagramXML,
+    };
+    this.state.nodeMap.set(key, updatedNode);
+
+    // Log operation for delta sync
+    if (this.opLogger) {
+      this.opLogger.logNodeUpdate(key, { diagramXML });
+    }
+
+    this.render();
   }
 
   private insertDivider(): void {
