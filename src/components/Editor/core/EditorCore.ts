@@ -232,6 +232,33 @@ export class EditorCore {
     this.opLogger?.clear();
   }
 
+  // Get unsynced node keys (for visual indicators)
+  getUnsyncedNodeKeys(): Set<string> {
+    return this.opLogger?.getUnsyncedNodeKeys() || new Set();
+  }
+
+  // Set callback for unsynced node changes (for visual indicators)
+  setUnsyncedChangeCallback(callback: (nodeKeys: Set<string>) => void): void {
+    this.opLogger?.setUnsyncedChangeCallback(callback);
+  }
+
+  // Update unsynced block indicators in DOM
+  updateUnsyncedIndicators(unsyncedKeys: Set<string>): void {
+    if (!this.container) return;
+
+    // Remove indicator from all blocks first
+    const allBlocks = this.container.querySelectorAll('.editorUnsyncedBlock');
+    allBlocks.forEach(block => block.classList.remove('editorUnsyncedBlock'));
+
+    // Add indicator to unsynced blocks
+    unsyncedKeys.forEach(key => {
+      const element = this.container?.querySelector(`[data-editor-key="${key}"]`);
+      if (element) {
+        element.classList.add('editorUnsyncedBlock');
+      }
+    });
+  }
+
   // Dispatch a command
   dispatchCommand(command: EditorCommand): void {
     switch (command.type) {
@@ -971,16 +998,52 @@ export class EditorCore {
     if (codeBlockCtx) {
       // Inside code block: insert text with newlines preserved (no paragraph breaks)
       this.insertText(text);
-    } else {
-      // Normal paste: split by newlines and insert each line as separate paragraph
-      const lines = text.split(/\r?\n/);
+      return;
+    }
+
+    // Check if content looks like a list (lines starting with bullets or numbers)
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
+    const bulletPattern = /^[\s]*[•\-\*]\s+/;
+    const numberPattern = /^[\s]*\d+[\.\)]\s+/;
+
+    const isBulletList = lines.length > 0 && lines.every(line => bulletPattern.test(line) || !line.trim());
+    const isNumberedList = lines.length > 0 && lines.every(line => numberPattern.test(line) || !line.trim());
+
+    if (isBulletList || isNumberedList) {
+      // Paste as a list
+      const listType = isNumberedList ? 'number' : 'bullet';
+
+      // First, convert current block to list if not already
+      this.toggleList(listType as ListType);
+
       lines.forEach((line, index) => {
-        if (index > 0) {
-          // Insert paragraph break for each newline
+        // Remove bullet/number prefix
+        const cleanedLine = line.replace(bulletPattern, '').replace(numberPattern, '').trim();
+
+        if (index > 0 && cleanedLine) {
+          // Create new list item for subsequent lines
           this.dispatchCommand({ type: 'INSERT_PARAGRAPH' });
         }
-        if (line) {
-          this.insertText(line);
+
+        if (cleanedLine) {
+          this.insertText(cleanedLine);
+        }
+      });
+    } else {
+      // Normal paste: split by double newlines to create paragraph breaks
+      // Single newlines within a paragraph are converted to spaces (flowing text)
+      const paragraphs = text.split(/\n\s*\n/); // Split on double newlines (with optional whitespace)
+
+      paragraphs.forEach((paragraph, paragraphIndex) => {
+        if (paragraphIndex > 0) {
+          // Insert paragraph break for each double newline (new block)
+          this.dispatchCommand({ type: 'INSERT_PARAGRAPH' });
+        }
+
+        // Within a paragraph, replace single newlines with spaces for flowing text
+        const cleanedParagraph = paragraph.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+        if (cleanedParagraph) {
+          this.insertText(cleanedParagraph);
         }
       });
     }

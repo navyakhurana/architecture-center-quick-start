@@ -175,7 +175,7 @@
 }
 
 .editorParagraph {
-    margin: 0 0 1rem 0;
+    margin: 0 0 1.5rem 0;
 }
 
 :global(.editorEmptyBlock.editorFocusedBlock) {
@@ -936,4 +936,90 @@
 :global(:root[data-theme='dark'] #article-header > p strong) {
     color: var(--editor-text);
     font-weight: 700;
+}
+
+/* Direct dark mode class - applied via React when colorMode is dark */
+.darkMode {
+    --editor-bg: #111827;
+    --editor-surface: #1f2937;
+    --editor-text: #e5e7eb;
+    --editor-border: #374151;
+    --editor-placeholder: #6b7280;
+    background-color: var(--editor-bg) !important;
+}
+
+.darkMode .stickyToolbarWrapper {
+    background-color: var(--editor-surface) !important;
+}
+
+.darkMode .editorContainer {
+    background-color: var(--editor-surface) !important;
+    color: var(--editor-text);
+    border-color: var(--editor-border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.darkMode .contentHeader {
+    background-color: var(--editor-surface) !important;
+    color: var(--editor-text);
+}
+
+.darkMode .editorInput {
+    color: var(--editor-text);
+    caret-color: var(--editor-text);
+    background-color: var(--editor-surface) !important;
+}
+
+.darkMode .editorPlaceholder {
+    color: var(--editor-placeholder);
+}
+
+.darkMode .saveTimestamp {
+    color: #9ca3af;
+}
+
+.darkMode .editorScrollArea {
+    background-color: var(--editor-surface) !important;
+}
+
+.darkMode .editorScrollContent {
+    background-color: var(--editor-surface) !important;
+}
+
+/* Unsynced block indicator - yellow line on left gutter */
+:global(.editorUnsyncedBlock) {
+    position: relative;
+}
+
+:global(.editorUnsyncedBlock)::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -2rem;
+    width: 3px;
+    height: 100%;
+    background-color: #f59e0b;
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+:root[data-theme='dark'] :global(.editorUnsyncedBlock)::after {
+    background-color: #fbbf24;
+}
+
+/* Media loading placeholder */
+:global(.editorMediaPlaceholder) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px dashed #dee2e6;
+}
+
+:root[data-theme='dark'] :global(.editorMediaPlaceholder) {
+    background-color: #1f2937;
+    border-color: #374151;
 }

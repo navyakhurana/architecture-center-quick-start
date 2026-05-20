@@ -3,6 +3,7 @@ import '@ui5/webcomponents-icons/dist/AllIcons';
 import { Button, Dialog, Bar, Text, Title } from '@ui5/webcomponents-react';
 import { usePageDataStore, Document } from '@site/src/store/pageDataStore';
 import { useAuth } from '@site/src/context/AuthContext';
+import { useColorMode } from '@docusaurus/theme-common';
 import { EditorCore } from './core';
 import { EditorContext, EditorContextValue } from './hooks/useEditor';
 import { ImageNode, DrawioNode } from './core/types';
@@ -14,6 +15,7 @@ import BlockHandlePlugin from './plugins/BlockHandlePlugin';
 import TableMenuPlugin from './plugins/TableMenuPlugin';
 import TableOfContentsPlugin from './plugins/TableOfContentsPlugin';
 import LinkPreviewPlugin from './plugins/LinkPreviewPlugin';
+import MediaLoadingPlugin from './plugins/MediaLoadingPlugin';
 import { convertToLexicalFormat } from './utils/convertToLexical';
 import { getApiService } from '@site/src/services/api';
 import styles from './index.module.css';
@@ -99,6 +101,7 @@ function EditorContent({ containerRef, readOnly }: EditorContentProps) {
         ref={containerRef}
         className={styles.editorInput}
       />
+      <MediaLoadingPlugin />
       {!readOnly && (
         <>
           <FloatingToolbarPlugin />
@@ -119,6 +122,26 @@ interface EditorProps {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Format timestamp to human readable format
+const formatTimestamp = (timestamp: string | null): string => {
+  if (!timestamp) return '';
+  try {
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return timestamp;
+
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
+  } catch {
+    return timestamp;
+  }
+};
+
 interface PublishStatus {
   stage: PublishStage;
   error: string | null;
@@ -130,6 +153,7 @@ const Editor: React.FC<EditorProps> = ({ onAddNew, onEditMeta }) => {
   const { getActiveDocument, lastSaveTimestamp, deleteDocument, documents, resetStore, updateDocument, isSyncing, syncError, syncOperations } =
     usePageDataStore();
   const { token, user } = useAuth();
+  const { colorMode } = useColorMode();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const activeDocument = getActiveDocument();
@@ -150,7 +174,6 @@ const Editor: React.FC<EditorProps> = ({ onAddNew, onEditMeta }) => {
   const baseUrl = siteConfig.baseUrl;
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [userForkUrl, setUserForkUrl] = useState('');
-
   const loadAssetsForState = useCallback(async (core: EditorCore) => {
     console.log('[Editor] loadAssetsForState called', { hasToken: !!token, hasBackendUrl: !!expressBackendUrl });
     if (!token || !expressBackendUrl) {
@@ -375,6 +398,11 @@ const Editor: React.FC<EditorProps> = ({ onAddNew, onEditMeta }) => {
     core.mount(containerRef.current);
     coreRef.current = core;
 
+    // Set up callback for unsynced node indicators
+    core.setUnsyncedChangeCallback((unsyncedKeys) => {
+      core.updateUnsyncedIndicators(unsyncedKeys);
+    });
+
     const updateContext = () => {
       setContextValue({
         core,
@@ -394,6 +422,19 @@ const Editor: React.FC<EditorProps> = ({ onAddNew, onEditMeta }) => {
     // Load assets - will be skipped if token not available, but second useEffect handles that
     loadAssetsForState(core);
 
+    // Warn user if there are unsaved changes before leaving
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const currentState = serializeState(core.getState());
+      const currentDoc = getActiveDocument();
+      // Data is already in localStorage via zustand persist, just warn user
+      if (currentDoc && currentState !== currentDoc.editorState && !currentDoc.isReadOnly) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
       // Clear any pending full sync timeout
       if (fullSyncTimeout) {
@@ -403,6 +444,7 @@ const Editor: React.FC<EditorProps> = ({ onAddNew, onEditMeta }) => {
       if (periodicSyncTimer) {
         clearTimeout(periodicSyncTimer);
       }
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       unsubscribe();
       core.destroy();
     };
@@ -550,7 +592,7 @@ const Editor: React.FC<EditorProps> = ({ onAddNew, onEditMeta }) => {
 
   return (
     <EditorContext.Provider value={contextValue}>
-      <div className={styles.editorPageWrapper}>
+      <div className={`${styles.editorPageWrapper} ${colorMode === 'dark' ? styles.darkMode : ''}`}>
         <div className={styles.navColumn}>
           <PageTabs onAddNew={onAddNew} />
         </div>
@@ -570,7 +612,7 @@ const Editor: React.FC<EditorProps> = ({ onAddNew, onEditMeta }) => {
                 )}
                 {!isReadOnly && lastSaveTimestamp && (
                   <span className={styles.saveTimestamp}>
-                    {isSyncing ? 'Saving...' : syncError ? `Error: ${syncError}` : `Last saved: ${lastSaveTimestamp}`}
+                    {isSyncing ? 'Saving...' : syncError ? `Error: ${syncError}` : `Last saved: ${formatTimestamp(lastSaveTimestamp)}`}
                   </span>
                 )}
                 {!isReadOnly && (
@@ -610,8 +652,7 @@ const Editor: React.FC<EditorProps> = ({ onAddNew, onEditMeta }) => {
                         c => !(activeDocument?.authors || []).includes(c)
                       )
                     ]}
-                    onContributorsChange={isReadOnly ? undefined : handleContributorsUpdate}
-                    readOnly={isReadOnly}
+                    readOnly={true}
                   />
                 </div>
               </div>
