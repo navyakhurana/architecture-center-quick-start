@@ -498,7 +498,31 @@ export class DOMReconciler {
     return wrapper;
   }
 
+  private setupDrawioResizeListener(): void {
+    // Single global listener for all drawio resize messages
+    if ((window as any).__drawioResizeListenerSetup) return;
+    (window as any).__drawioResizeListenerSetup = true;
+
+    window.addEventListener('message', (event: MessageEvent) => {
+      if (event.data && event.data.type === 'drawio-resize') {
+        // Find the iframe that sent this message
+        const iframes = document.querySelectorAll('.editorDrawioIframe') as NodeListOf<HTMLIFrameElement>;
+        for (const iframe of iframes) {
+          if (iframe.contentWindow === event.source) {
+            const newHeight = Math.max(event.data.height, 200);
+            iframe.style.height = `${newHeight}px`;
+            console.log('[Drawio] Resized iframe to', newHeight);
+            break;
+          }
+        }
+      }
+    });
+  }
+
   private createDrawioElement(node: DrawioNode): HTMLElement {
+    // Ensure global resize listener is set up
+    this.setupDrawioResizeListener();
+
     const wrapper = document.createElement('div');
     wrapper.setAttribute(DATA_KEY_ATTR, node.key);
     wrapper.setAttribute('contenteditable', 'false');
@@ -508,17 +532,7 @@ export class DOMReconciler {
     iframe.className = 'editorDrawioIframe';
     iframe.frameBorder = '0';
     iframe.width = '100%';
-    // Set initial height, will be resized by postMessage from iframe content
     iframe.style.height = '400px';
-
-    // Listen for resize messages from the iframe
-    const handleResize = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'drawio-resize' && event.source === iframe.contentWindow) {
-        const newHeight = Math.max(event.data.height, 200);
-        iframe.style.height = `${newHeight}px`;
-      }
-    };
-    window.addEventListener('message', handleResize);
 
     // Use srcdoc with embedded viewer for large diagrams (URL length limits)
     if (node.diagramXML) {
@@ -639,11 +653,13 @@ export class DOMReconciler {
 <head>
   <meta charset="UTF-8">
   <style>
-    body { margin: 0; padding: 0; overflow: visible; background: #fff; }
-    #diagram { width: 100%; min-height: 200px; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; background: #fafafa; overflow: hidden; }
+    #diagram { width: 100%; padding: 10px; }
     .loading { display: flex; align-items: center; justify-content: center; height: 200px; color: #666; }
     .error { color: #c00; padding: 20px; }
-    .mxgraph { max-width: 100%; overflow: visible; }
+    .geDiagramContainer { overflow: visible !important; }
+    .geDiagramContainer svg { display: block; width: 100%; height: auto; }
   </style>
 </head>
 <body>
@@ -651,13 +667,70 @@ export class DOMReconciler {
   <script src="https://viewer.diagrams.net/js/viewer-static.min.js"><\/script>
   <script>
     (function() {
-      // Function to resize iframe to fit content
+      var resizeSent = false;
+
       function resizeIframe() {
-        var height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, 400);
-        // Send message to parent to resize iframe
-        if (window.parent !== window) {
-          window.parent.postMessage({ type: 'drawio-resize', height: height }, '*');
+        // Try multiple selectors for the SVG
+        var svg = document.querySelector('.geDiagramContainer svg') ||
+                  document.querySelector('.mxgraph svg') ||
+                  document.querySelector('#diagram svg') ||
+                  document.querySelector('svg');
+        var container = document.querySelector('.geDiagramContainer') || document.querySelector('.mxgraph');
+        var height = 400;
+
+        if (svg) {
+          // Use getBoundingClientRect for actual rendered size
+          var rect = svg.getBoundingClientRect();
+          height = rect.height;
+
+          // If that's too small, try the svg height attribute
+          if (height < 100) {
+            var svgHeightAttr = svg.getAttribute('height');
+            if (svgHeightAttr) {
+              height = parseFloat(svgHeightAttr);
+            }
+          }
+
+          height = Math.max(height, 200);
+          resizeSent = true;
+        } else if (container) {
+          height = Math.max(container.scrollHeight, container.offsetHeight, 200);
         }
+
+        console.log('[Drawio iframe] Sending resize:', height, 'svg found:', !!svg);
+
+        if (window.parent !== window) {
+          window.parent.postMessage({ type: 'drawio-resize', height: Math.ceil(height) + 50 }, '*');
+        }
+      }
+
+      // Watch for SVG to be added to DOM
+      function watchForSVG() {
+        var observer = new MutationObserver(function(mutations) {
+          // Try multiple selectors
+          var svg = document.querySelector('.geDiagramContainer svg') ||
+                    document.querySelector('.mxgraph svg') ||
+                    document.querySelector('#diagram svg') ||
+                    document.querySelector('svg');
+          if (svg) {
+            console.log('[Drawio iframe] SVG found via MutationObserver, selector:', svg.parentElement?.className);
+            observer.disconnect();
+            // Give it a moment to fully render
+            setTimeout(resizeIframe, 100);
+            setTimeout(resizeIframe, 500);
+            setTimeout(resizeIframe, 1000);
+          }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        // Fallback timeout in case observer misses it
+        setTimeout(function() {
+          if (!resizeSent) {
+            console.log('[Drawio iframe] Fallback timeout, checking DOM:', document.body.innerHTML.substring(0, 500));
+            observer.disconnect();
+            resizeIframe();
+          }
+        }, 5000);
       }
 
       try {
@@ -671,28 +744,26 @@ export class DOMReconciler {
         var div = document.createElement('div');
         div.className = 'mxgraph';
         div.setAttribute('data-mxgraph', JSON.stringify({
-          highlight: '#0000ff',
-          nav: true,
+          xml: xml,
+          lightbox: false,
+          nav: false,
           resize: true,
-          toolbar: 'zoom layers lightbox',
-          xml: xml
+          toolbar: '',
+          border: 0
         }));
         container.appendChild(div);
 
-        // Wait for viewer library to load, then initialize
         var currentScale = 1;
+
+        // Start watching for SVG before creating viewer
+        watchForSVG();
+
         var initViewer = function() {
           if (typeof GraphViewer !== 'undefined') {
             try {
               GraphViewer.createViewerForElement(div);
-              // Resize after rendering with delay to ensure content is rendered
-              setTimeout(resizeIframe, 500);
-              setTimeout(resizeIframe, 1000);
-              setTimeout(resizeIframe, 2000);
             } catch (viewerError) {
-              // Viewer error but diagram might still be partially rendered
-              console.warn('GraphViewer warning:', viewerError.message);
-              setTimeout(resizeIframe, 500);
+              console.error('GraphViewer error:', viewerError);
             }
           } else {
             setTimeout(initViewer, 100);
@@ -700,11 +771,12 @@ export class DOMReconciler {
         };
         initViewer();
 
-        // Listen for zoom messages from parent - use CSS transform
         window.addEventListener('message', function(event) {
           if (event.data && event.data.type === 'zoom') {
-            var diagramContainer = document.querySelector('.geDiagramContainer') || document.querySelector('#diagram');
-            if (diagramContainer) {
+            var svg = document.querySelector('.geDiagramContainer svg') ||
+                      document.querySelector('.mxgraph svg') ||
+                      document.querySelector('svg');
+            if (svg) {
               if (event.data.direction === 'in') {
                 currentScale = Math.min(currentScale * 1.25, 3);
               } else if (event.data.direction === 'out') {
@@ -712,14 +784,14 @@ export class DOMReconciler {
               } else if (event.data.direction === 'fit') {
                 currentScale = 1;
               }
-              diagramContainer.style.transform = 'scale(' + currentScale + ')';
-              diagramContainer.style.transformOrigin = 'top left';
+              svg.style.transform = 'scale(' + currentScale + ')';
+              svg.style.transformOrigin = 'top left';
               setTimeout(resizeIframe, 100);
             }
           }
         });
       } catch (e) {
-        document.getElementById('diagram').innerHTML = '<div class="error">Error loading diagram: ' + e.message + '</div>';
+        document.getElementById('diagram').innerHTML = '<div class="error">Error: ' + e.message + '</div>';
         console.error('Drawio render error:', e);
       }
     })();
@@ -1070,6 +1142,7 @@ export class DOMReconciler {
         iframe.frameBorder = '0';
         iframe.width = '100%';
         iframe.style.height = '400px';
+
         iframe.srcdoc = this.createDrawioSrcdoc(drawioNode.diagramXML);
 
         // Add toolbar

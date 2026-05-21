@@ -3,7 +3,7 @@ import { useEditor } from '../../hooks/useEditor';
 import { useIsVisible } from '@site/src/hooks/useIsVisible';
 import {
   ChevronDown, Underline, Bold, Italic, Strikethrough, Code, Quote, List,
-  ListOrdered, Undo, Redo, Heading1, Heading2, MoreHorizontal,
+  ListOrdered, Undo, Redo, Heading1, Heading2, Heading3, MoreHorizontal,
   Info, Lightbulb, AlertTriangle, AlertCircle, StickyNote
 } from 'lucide-react';
 import styles from './index.module.css';
@@ -72,6 +72,7 @@ const blockTypeToBlockName: Record<string, string> = {
   h1: 'Heading 1',
   h2: 'Heading 1',  // Level 2 displays as "Heading 1" to user
   h3: 'Heading 2',  // Level 3 displays as "Heading 2" to user
+  h4: 'Heading 3',  // Level 4 displays as "Heading 3" to user
   paragraph: 'Paragraph',
   quote: 'Quote',
   heading: 'Heading',
@@ -90,7 +91,7 @@ function BlockFormatDropDown() {
 
   useClickOutside(dropDownRef, () => setShowDropDown(false));
 
-  const formatHeading = (level: 2 | 3) => {
+  const formatHeading = (level: 2 | 3 | 4) => {
     editor.dispatchCommand({ type: 'SET_BLOCK_TYPE', payload: { blockType: 'heading', level } });
     setShowDropDown(false);
   };
@@ -120,6 +121,9 @@ function BlockFormatDropDown() {
           </button>
           <button className={styles.dropdownItem} onClick={() => formatHeading(3)}>
             <Heading2 size={18} /> Heading 2
+          </button>
+          <button className={styles.dropdownItem} onClick={() => formatHeading(4)}>
+            <Heading3 size={18} /> Heading 3
           </button>
           <button className={styles.dropdownItem} onClick={formatQuote}>
             <Quote size={18} /> Quote
