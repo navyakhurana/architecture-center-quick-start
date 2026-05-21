@@ -9,6 +9,7 @@ import {
   Type,
   Heading1,
   Heading2,
+  Heading3,
   List,
   ListOrdered,
   Quote,
@@ -348,6 +349,19 @@ export default function SlashCommandPlugin() {
         onSelect: () => {
           // Internally stored as level 3, renders as h3 in output
           editor.dispatchCommand({ type: 'SET_BLOCK_TYPE', payload: { blockType: 'heading', level: 3 } });
+        },
+      },
+      {
+        id: 'heading3',
+        name: 'Heading 3',
+        description: 'Small section heading',
+        icon: <Heading3 size={20} />,
+        keywords: ['heading', 'h3', 'header', 'subheading'],
+        hint: '###',
+        category: 'Basic Blocks',
+        onSelect: () => {
+          // Internally stored as level 4, renders as h4 in output
+          editor.dispatchCommand({ type: 'SET_BLOCK_TYPE', payload: { blockType: 'heading', level: 4 } });
         },
       },
       {

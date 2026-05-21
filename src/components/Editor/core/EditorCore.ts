@@ -308,8 +308,8 @@ export class EditorCore {
         this.updateLastDrawio(updateDrawioPayload.diagramXML, updateDrawioPayload.assetId);
         break;
       case 'UPDATE_DRAWIO_BY_KEY':
-        const updateByKeyPayload = command.payload as { key: string; diagramXML: string };
-        this.updateDrawioByKey(updateByKeyPayload.key, updateByKeyPayload.diagramXML);
+        const updateByKeyPayload = command.payload as { key: string; diagramXML: string; assetId?: string };
+        this.updateDrawioByKey(updateByKeyPayload.key, updateByKeyPayload.diagramXML, updateByKeyPayload.assetId);
         break;
       case 'INSERT_DIVIDER':
         this.insertDivider();
@@ -430,7 +430,19 @@ export class EditorCore {
   getActiveBlockType(): string {
     if (!this.selection) return 'paragraph';
     const block = getBlockAncestor(this.state, this.selection.anchor.key);
-    return block?.type || 'paragraph';
+    if (!block) return 'paragraph';
+
+    // For headings, return 'h2', 'h3', 'h4' based on level
+    if (block.type === 'heading' && 'level' in block) {
+      return `h${(block as any).level}`;
+    }
+
+    // For admonitions, return the admonition type
+    if (block.type === 'admonition' && 'admonitionType' in block) {
+      return (block as any).admonitionType;
+    }
+
+    return block.type || 'paragraph';
   }
 
   // Private methods
@@ -3187,7 +3199,7 @@ export class EditorCore {
     }
   }
 
-  private updateDrawioByKey(key: string, diagramXML: string): void {
+  private updateDrawioByKey(key: string, diagramXML: string, assetId?: string): void {
     const node = getNode(this.state, key);
     if (!node || node.type !== 'drawio') return;
 
@@ -3195,12 +3207,18 @@ export class EditorCore {
     const updatedNode: DrawioNode = {
       ...drawioNode,
       diagramXML,
+      // Update assetId if provided (new upload), otherwise keep existing
+      assetId: assetId ?? drawioNode.assetId,
     };
     this.state.nodeMap.set(key, updatedNode);
 
     // Log operation for delta sync
     if (this.opLogger) {
-      this.opLogger.logNodeUpdate(key, { diagramXML });
+      const updatePayload: Record<string, any> = { diagramXML };
+      if (assetId) {
+        updatePayload.assetId = assetId;
+      }
+      this.opLogger.logNodeUpdate(key, updatePayload);
     }
 
     this.render();
