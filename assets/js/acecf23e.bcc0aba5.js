@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunksap_architecture_center=globalThis.webpackChunksap_architecture_center||[]).push([[81903],{1912(e){e.exports=JSON.parse('{"blogBasePath":"/architecture-center-quick-start/news","blogTitle":"SAP Architecture Center News","authorsListPath":"/architecture-center-quick-start/news/authors"}')}}]);
