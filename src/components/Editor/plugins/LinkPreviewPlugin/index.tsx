@@ -220,31 +220,39 @@ export default function LinkPreviewPlugin() {
     container.addEventListener('mouseover', handleMouseOver);
     container.addEventListener('mouseout', handleMouseOut);
 
-    return () => {
-      container.removeEventListener('mouseover', handleMouseOver);
-      container.removeEventListener('mouseout', handleMouseOut);
-      if (hideTimeoutRef.current) {
-        clearTimeout(hideTimeoutRef.current);
-      }
-    };
-  }, [editor, handleMouseOver, handleMouseOut]);
-
-  // Prevent link click from navigating
-  useEffect(() => {
-    const container = editor.core?.getContainer();
-    if (!container) return;
-
+    // Close preview when clicking anywhere in the editor (except on links)
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       const linkElement = target.closest('a.editorLink');
+      if (!linkElement && !isHoveringPreview) {
+        setHoveredLink(null);
+      }
+      // Prevent link navigation in editor
       if (linkElement) {
         e.preventDefault();
       }
     };
 
+    // Close preview when selection changes
+    const handleSelectionChange = () => {
+      if (!isHoveringPreview) {
+        setHoveredLink(null);
+      }
+    };
+
     container.addEventListener('click', handleClick);
-    return () => container.removeEventListener('click', handleClick);
-  }, [editor]);
+    document.addEventListener('selectionchange', handleSelectionChange);
+
+    return () => {
+      container.removeEventListener('mouseover', handleMouseOver);
+      container.removeEventListener('mouseout', handleMouseOut);
+      container.removeEventListener('click', handleClick);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+      }
+    };
+  }, [editor, handleMouseOver, handleMouseOut, isHoveringPreview]);
 
   return (
     <>

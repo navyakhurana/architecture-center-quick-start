@@ -17,15 +17,13 @@ const formatDate = (timestamp: string | null | undefined): string => {
             return timestamp;
         }
 
-        // Format: DD/MM/YYYY, HH:MM:SS
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
+        // Format: Mon DD, YYYY (e.g., May 22, 2026)
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = months[date.getMonth()];
+        const day = date.getDate();
         const year = date.getFullYear();
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
 
-        return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
+        return `${month} ${day}, ${year}`;
     } catch {
         return timestamp;
     }

@@ -104,6 +104,15 @@
     background-color: var(--slash-menu-selected-bg);
 }
 
+.menuItem.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.menuItem.disabled:hover {
+    background-color: transparent;
+}
+
 .icon {
     flex-shrink: 0;
     width: 36px;

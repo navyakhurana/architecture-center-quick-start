@@ -10,6 +10,7 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Heading4,
   List,
   ListOrdered,
   Quote,
@@ -34,6 +35,8 @@ interface CommandOption {
   keywords: string[];
   hint?: string;
   category?: string;
+  disabled?: boolean;
+  disabledReason?: string;
   onSelect: () => void;
 }
 
@@ -59,16 +62,22 @@ function CommandMenuItem({
   return (
     <li
       ref={ref}
-      className={`${styles.menuItem} ${isSelected ? styles.selected : ''}`}
-      onClick={onClick}
-      onMouseEnter={onMouseEnter}
+      className={`${styles.menuItem} ${isSelected ? styles.selected : ''} ${option.disabled ? styles.disabled : ''}`}
+      onClick={option.disabled ? undefined : onClick}
+      onMouseEnter={option.disabled ? undefined : onMouseEnter}
       role="option"
       aria-selected={isSelected}
+      aria-disabled={option.disabled}
+      title={option.disabled ? option.disabledReason : undefined}
     >
       <span className={styles.icon}>{option.icon}</span>
       <div className={styles.textContainer}>
         <span className={styles.text}>{option.name}</span>
-        {option.description && <span className={styles.description}>{option.description}</span>}
+        {option.disabled && option.disabledReason ? (
+          <span className={styles.description}>{option.disabledReason}</span>
+        ) : (
+          option.description && <span className={styles.description}>{option.description}</span>
+        )}
       </div>
       {option.hint && <span className={styles.hint}>{option.hint}</span>}
     </li>
@@ -333,10 +342,9 @@ export default function SlashCommandPlugin() {
         keywords: ['heading', 'h1', 'header', 'title'],
         hint: '#',
         category: 'Basic Blocks',
-        onSelect: () => {
-          // Internally stored as level 2, renders as h2 in output
-          editor.dispatchCommand({ type: 'SET_BLOCK_TYPE', payload: { blockType: 'heading', level: 2 } });
-        },
+        disabled: true,
+        disabledReason: 'Reserved for title only',
+        onSelect: () => {},
       },
       {
         id: 'heading2',
@@ -347,8 +355,7 @@ export default function SlashCommandPlugin() {
         hint: '##',
         category: 'Basic Blocks',
         onSelect: () => {
-          // Internally stored as level 3, renders as h3 in output
-          editor.dispatchCommand({ type: 'SET_BLOCK_TYPE', payload: { blockType: 'heading', level: 3 } });
+          editor.dispatchCommand({ type: 'SET_BLOCK_TYPE', payload: { blockType: 'heading', level: 2 } });
         },
       },
       {
@@ -360,7 +367,18 @@ export default function SlashCommandPlugin() {
         hint: '###',
         category: 'Basic Blocks',
         onSelect: () => {
-          // Internally stored as level 4, renders as h4 in output
+          editor.dispatchCommand({ type: 'SET_BLOCK_TYPE', payload: { blockType: 'heading', level: 3 } });
+        },
+      },
+      {
+        id: 'heading4',
+        name: 'Heading 4',
+        description: 'Smallest section heading',
+        icon: <Heading4 size={20} />,
+        keywords: ['heading', 'h4', 'header'],
+        hint: '####',
+        category: 'Basic Blocks',
+        onSelect: () => {
           editor.dispatchCommand({ type: 'SET_BLOCK_TYPE', payload: { blockType: 'heading', level: 4 } });
         },
       },

@@ -172,6 +172,39 @@ function MobileDeviceWarning() {
     );
 }
 
+function GitHubLoginRedirect({ loginUrl }: { loginUrl: string }) {
+    useEffect(() => {
+        // Redirect immediately to GitHub login
+        window.location.href = loginUrl;
+    }, [loginUrl]);
+
+    // Fallback UI while redirecting (or if redirect fails)
+    return (
+        <Card
+            header={
+                <FlexBox className={styles.centeredCardHeader}>
+                    <Icon name="locked" />
+                    <Title level="H5" wrappingType="None">
+                        GitHub Authentication Required
+                    </Title>
+                </FlexBox>
+            }
+            className={styles.authCard}
+        >
+            <div className={styles.authCardContent}>
+                <FlexBox alignItems="Center" justifyContent="Center" style={{ marginBottom: '1rem' }}>
+                    <BusyIndicator active size="M" />
+                </FlexBox>
+                <Text>Redirecting to GitHub login...</Text>
+                <Text style={{ marginTop: '1rem', color: '#666' }}>
+                    If you are not redirected automatically,{' '}
+                    <a href={loginUrl} style={{ color: '#0a6ed1' }}>click here</a>.
+                </Text>
+            </div>
+        </Card>
+    );
+}
+
 export default function QuickStart(): JSX.Element {
     const { siteConfig } = useDocusaurusContext();
     const { users, loading } = useAuth();
@@ -204,42 +237,18 @@ export default function QuickStart(): JSX.Element {
     }
 
     if (!isGithubAuthenticated) {
+        const originUri = `${window.location.origin}${siteConfig.baseUrl}quick-start`;
+        const loginUrl = `${expressBackendUrl}/user/login?origin_uri=${encodeURIComponent(originUri)}&provider=github`;
+
         return (
             <Layout>
                 <Header
                     title="Quick Start"
-                    subtitle="GitHub authentication required to access the Quick Start tool"
+                    subtitle="Redirecting to GitHub login..."
                     breadcrumbCurrent="Quick Start"
                 />
                 <main className={styles.mainContainer}>
-                    <Card
-                        header={
-                            <FlexBox className={styles.centeredCardHeader}>
-                                <Icon name="locked" />
-                                <Title level="H5" wrappingType="None">
-                                    GitHub Authentication Required
-                                </Title>
-                            </FlexBox>
-                        }
-                        className={styles.authCard}
-                    >
-                        <div className={styles.authCardContent}>
-                            <Text>The QuickStart editor requires GitHub authentication to manage your documents.</Text>
-                            <Text>Please log in with your GitHub account to continue.</Text>
-                            <Button
-                                design="Emphasized"
-                                onClick={() => {
-                                    const originUri = `${window.location.origin}${siteConfig.baseUrl}quick-start`;
-                                    window.location.href = `${expressBackendUrl}/user/login?origin_uri=${encodeURIComponent(
-                                        originUri
-                                    )}&provider=github`;
-                                }}
-                            >
-                                Login with GitHub to Continue
-                            </Button>
-                            <Text>After logging in, you'll be redirected back to this page.</Text>
-                        </div>
-                    </Card>
+                    <GitHubLoginRedirect loginUrl={loginUrl} />
                 </main>
             </Layout>
         );

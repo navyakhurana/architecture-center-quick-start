@@ -1,8 +1,7 @@
 import React from 'react';
 import '@ui5/webcomponents-icons/dist/AllIcons';
-import { Button } from '@ui5/webcomponents-react';
 import { usePageDataStore, Document } from '@site/src/store/pageDataStore';
-import { Plus } from 'lucide-react';
+import { Plus, Eye } from 'lucide-react';
 import styles from './index.module.css';
 
 interface PageTabsProps {
@@ -16,7 +15,7 @@ const PageTabs: React.FC<PageTabsProps> = ({ onAddNew }) => {
         e.stopPropagation();
     };
 
-    const renderDocumentTree = (doc: Document) => {
+    const renderDocumentTree = (doc: Document, isSharedSection: boolean = false) => {
         const children = documents.filter((child) => child.parentId === doc.id);
         const canAddSubPage = onAddNew && !doc.isReadOnly;
 
@@ -25,7 +24,7 @@ const PageTabs: React.FC<PageTabsProps> = ({ onAddNew }) => {
                 <div
                     className={`${styles.navItem} ${!doc.parentId ? styles.rootItem : ''} ${
                         doc.id === activeDocumentId ? styles.active : ''
-                    }`}
+                    } ${doc.isReadOnly ? styles.readOnlyItem : ''}`}
                     onClick={() => openDocument(doc.id)}
                 >
                     <span className={styles.itemTitle} title={doc.title || 'Untitled Page'}>
@@ -43,11 +42,14 @@ const PageTabs: React.FC<PageTabsProps> = ({ onAddNew }) => {
                             <Plus size={18} />
                         </button>
                     )}
+                    {doc.isReadOnly && !doc.parentId && (
+                        <Eye size={14} className={styles.viewOnlyIcon} />
+                    )}
                 </div>
                 {children.length > 0 && (
                     <ul className={styles.childrenList}>
                         {children.map((child) => (
-                            <li key={child.id}>{renderDocumentTree(child)}</li>
+                            <li key={child.id}>{renderDocumentTree(child, isSharedSection)}</li>
                         ))}
                     </ul>
                 )}
@@ -55,7 +57,10 @@ const PageTabs: React.FC<PageTabsProps> = ({ onAddNew }) => {
         );
     };
 
+    // Separate documents into owned (author) and shared (contributor)
     const rootDocuments = documents.filter((doc) => doc.parentId === null);
+    const myDocuments = rootDocuments.filter((doc) => !doc.isReadOnly);
+    const sharedDocuments = rootDocuments.filter((doc) => doc.isReadOnly);
 
     return (
         <div className={styles.navContainer}>
@@ -70,7 +75,36 @@ const PageTabs: React.FC<PageTabsProps> = ({ onAddNew }) => {
                 </button>
             )}
             <div className={styles.documentsList}>
-                {rootDocuments.map((doc) => renderDocumentTree(doc))}
+                {/* My Documents section */}
+                {myDocuments.length > 0 && (
+                    <>
+                        {sharedDocuments.length > 0 && (
+                            <div className={styles.sectionHeader}>My Documents</div>
+                        )}
+                        {myDocuments.map((doc) => renderDocumentTree(doc))}
+                    </>
+                )}
+
+                {/* Shared with me section */}
+                {sharedDocuments.length > 0 && (
+                    <>
+                        <div className={styles.sectionDivider} />
+                        <div className={styles.sectionHeader}>
+                            <span>Shared with me</span>
+                            <Eye size={14} className={styles.sectionIcon} />
+                        </div>
+                        <div className={styles.sharedSection}>
+                            {sharedDocuments.map((doc) => renderDocumentTree(doc, true))}
+                        </div>
+                    </>
+                )}
+
+                {/* Empty state */}
+                {rootDocuments.length === 0 && (
+                    <div className={styles.emptyState}>
+                        No documents yet. Create your first Reference Architecture!
+                    </div>
+                )}
             </div>
         </div>
     );
