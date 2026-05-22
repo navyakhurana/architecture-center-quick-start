@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor } from '../../hooks/useEditor';
-import { useIsVisible } from '@site/src/hooks/useIsVisible';
+import { useAuth } from '@site/src/context/AuthContext';
+import { usePageDataStore } from '@site/src/store/pageDataStore';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import { getApiService } from '@site/src/services/api';
 import {
   ChevronDown, Underline, Bold, Italic, Strikethrough, Code, Quote, List,
-  ListOrdered, Undo, Redo, Heading1, Heading2, Heading3, MoreHorizontal,
-  Info, Lightbulb, AlertTriangle, AlertCircle, StickyNote
+  ListOrdered, Undo, Redo, Heading1, Heading2, Heading3, Heading4,
+  Info, Lightbulb, AlertTriangle, AlertCircle, StickyNote, Type,
+  Image, PenTool, FileText, Table
 } from 'lucide-react';
 import styles from './index.module.css';
 
@@ -17,19 +21,6 @@ interface ToolbarState {
   canUndo: boolean;
   canRedo: boolean;
   blockType: string;
-}
-
-interface ToolItem {
-  id: string;
-  group?: string;
-  component?: React.ReactNode;
-  type?: 'divider' | 'tool';
-}
-
-interface ResponsiveItemProps {
-  id: string;
-  children: React.ReactNode;
-  setHiddenIds: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: (event: MouseEvent) => void) {
@@ -46,35 +37,14 @@ function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: (eve
   }, [ref, handler]);
 }
 
-const ResponsiveItem: React.FC<ResponsiveItemProps> = ({ id, children, setHiddenIds }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const isVisible = useIsVisible(ref as React.RefObject<HTMLElement>);
-
-  useEffect(() => {
-    if (id.startsWith('divider')) return;
-
-    setHiddenIds((prev) => {
-      const exists = prev.includes(id);
-      if (!isVisible && !exists) return [...prev, id];
-      if (isVisible && exists) return prev.filter((item) => item !== id);
-      return prev;
-    });
-  }, [id, isVisible, setHiddenIds]);
-
-  return (
-    <div ref={ref} className={styles.responsiveItemWrapper}>
-      {children}
-    </div>
-  );
-};
-
 const blockTypeToBlockName: Record<string, string> = {
   h1: 'Heading 1',
-  h2: 'Heading 1',  // Level 2 displays as "Heading 1" to user
-  h3: 'Heading 2',  // Level 3 displays as "Heading 2" to user
-  h4: 'Heading 3',  // Level 4 displays as "Heading 3" to user
+  h2: 'Heading 2',
+  h3: 'Heading 3',
+  h4: 'Heading 4',
   paragraph: 'Paragraph',
   quote: 'Quote',
+  code: 'Code',
   heading: 'Heading',
   note: 'Note',
   info: 'Info',
@@ -106,27 +76,85 @@ function BlockFormatDropDown() {
     setShowDropDown(false);
   };
 
+  const formatCode = () => {
+    editor.dispatchCommand({ type: 'SET_BLOCK_TYPE', payload: { blockType: 'code' } });
+    setShowDropDown(false);
+  };
+
   return (
     <div className={styles.dropdown} ref={dropDownRef}>
-      <button className={styles.dropdownToggle} onClick={() => setShowDropDown((v) => !v)}>
-        {blockTypeToBlockName[blockType] || 'Paragraph'} <ChevronDown size={16} />
+      <button className={styles.dropdownToggle} onClick={() => setShowDropDown((v) => !v)} title="Block type">
+        <Type size={16} />
+        <span className={styles.dropdownLabel}>{blockTypeToBlockName[blockType] || 'Paragraph'}</span>
+        <ChevronDown size={14} />
       </button>
       {showDropDown && (
-        <div className={styles.dropdownMenu} style={{ zIndex: 100 }}>
+        <div className={styles.dropdownMenu}>
           <button className={styles.dropdownItem} onClick={formatParagraph}>
-            Paragraph
+            <Type size={16} /> Paragraph
+          </button>
+          <button className={`${styles.dropdownItem} ${styles.disabled}`} disabled title="Reserved for title only">
+            <Heading1 size={16} /> Heading 1
           </button>
           <button className={styles.dropdownItem} onClick={() => formatHeading(2)}>
-            <Heading1 size={18} /> Heading 1
+            <Heading2 size={16} /> Heading 2
           </button>
           <button className={styles.dropdownItem} onClick={() => formatHeading(3)}>
-            <Heading2 size={18} /> Heading 2
+            <Heading3 size={16} /> Heading 3
           </button>
           <button className={styles.dropdownItem} onClick={() => formatHeading(4)}>
-            <Heading3 size={18} /> Heading 3
+            <Heading4 size={16} /> Heading 4
           </button>
           <button className={styles.dropdownItem} onClick={formatQuote}>
-            <Quote size={18} /> Quote
+            <Quote size={16} /> Quote
+          </button>
+          <button className={styles.dropdownItem} onClick={formatCode}>
+            <Code size={16} /> Code Block
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InsertDropDown({ onInsertImage, onInsertDrawio, onInsertDocx }: {
+  onInsertImage: () => void;
+  onInsertDrawio: () => void;
+  onInsertDocx: () => void;
+}) {
+  const dropDownRef = useRef<HTMLDivElement>(null);
+  const [showDropDown, setShowDropDown] = useState(false);
+  const editor = useEditor();
+
+  useClickOutside(dropDownRef, () => setShowDropDown(false));
+
+  const insertTable = () => {
+    editor.dispatchCommand({ type: 'INSERT_TABLE', payload: { rows: 3, cols: 3 } });
+    setShowDropDown(false);
+  };
+
+  return (
+    <div className={styles.dropdown} ref={dropDownRef}>
+      <button className={styles.dropdownToggle} onClick={() => setShowDropDown((v) => !v)} title="Insert">
+        <Image size={16} />
+        <span className={styles.dropdownLabel}>Insert</span>
+        <ChevronDown size={14} />
+      </button>
+      {showDropDown && (
+        <div className={styles.dropdownMenu}>
+          <div className={styles.dropdownSection}>Media</div>
+          <button className={styles.dropdownItem} onClick={() => { onInsertImage(); setShowDropDown(false); }}>
+            <Image size={16} /> Image
+          </button>
+          <button className={styles.dropdownItem} onClick={() => { onInsertDrawio(); setShowDropDown(false); }}>
+            <PenTool size={16} /> Diagram
+          </button>
+          <button className={styles.dropdownItem} onClick={() => { onInsertDocx(); setShowDropDown(false); }}>
+            <FileText size={16} /> Word Document
+          </button>
+          <div className={styles.dropdownSection}>Advanced</div>
+          <button className={styles.dropdownItem} onClick={insertTable}>
+            <Table size={16} /> Table
           </button>
         </div>
       )}
@@ -148,25 +176,27 @@ function AdmonitionDropDown() {
 
   return (
     <div className={styles.dropdown} ref={dropDownRef}>
-      <button className={styles.dropdownToggle} onClick={() => setShowDropDown((v) => !v)}>
-        <Info size={16} /> Callout <ChevronDown size={14} />
+      <button className={styles.dropdownToggle} onClick={() => setShowDropDown((v) => !v)} title="Callouts">
+        <Info size={16} />
+        <span className={styles.dropdownLabel}>Callout</span>
+        <ChevronDown size={14} />
       </button>
       {showDropDown && (
-        <div className={styles.dropdownMenu} style={{ zIndex: 100 }}>
+        <div className={styles.dropdownMenu}>
           <button className={styles.dropdownItem} onClick={() => insertAdmonition('note')}>
-            <StickyNote size={18} /> Note
+            <StickyNote size={16} /> Note
           </button>
           <button className={styles.dropdownItem} onClick={() => insertAdmonition('info')}>
-            <Info size={18} /> Info
+            <Info size={16} /> Info
           </button>
           <button className={styles.dropdownItem} onClick={() => insertAdmonition('tip')}>
-            <Lightbulb size={18} /> Tip
+            <Lightbulb size={16} /> Tip
           </button>
           <button className={styles.dropdownItem} onClick={() => insertAdmonition('warning')}>
-            <AlertTriangle size={18} /> Warning
+            <AlertTriangle size={16} /> Warning
           </button>
           <button className={styles.dropdownItem} onClick={() => insertAdmonition('danger')}>
-            <AlertCircle size={18} /> Danger
+            <AlertCircle size={16} /> Danger
           </button>
         </div>
       )}
@@ -176,9 +206,14 @@ function AdmonitionDropDown() {
 
 export default function ToolbarPlugin() {
   const editor = useEditor();
-  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
-  const [showHamburger, setShowHamburger] = useState(false);
-  const hamburgerRef = useRef<HTMLDivElement>(null);
+  const { token } = useAuth();
+  const { getActiveDocument } = usePageDataStore();
+  const { siteConfig } = useDocusaurusContext();
+  const backendUrl = siteConfig.customFields?.expressBackendUrl as string | undefined;
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingFileType = useRef<'image' | 'drawio' | 'docx' | null>(null);
+
   const [state, setState] = useState<ToolbarState>({
     isBold: false,
     isItalic: false,
@@ -189,8 +224,6 @@ export default function ToolbarPlugin() {
     canRedo: false,
     blockType: 'paragraph',
   });
-
-  useClickOutside(hamburgerRef, () => setShowHamburger(false));
 
   const updateToolbar = useCallback(() => {
     const formats = editor.getActiveFormats();
@@ -208,15 +241,159 @@ export default function ToolbarPlugin() {
 
   useEffect(() => {
     updateToolbar();
-    const intervalId = setInterval(updateToolbar, 100);
-    return () => clearInterval(intervalId);
-  }, [updateToolbar]);
+    const unsubscribe = editor.core?.subscribe(() => updateToolbar());
+    document.addEventListener('selectionchange', updateToolbar);
+    return () => {
+      unsubscribe?.();
+      document.removeEventListener('selectionchange', updateToolbar);
+    };
+  }, [editor, updateToolbar]);
 
-  const tools: ToolItem[] = [
-    {
-      id: 'undo',
-      group: 'History',
-      component: (
+  const handleFileUpload = useCallback((type: 'image' | 'drawio' | 'docx') => {
+    pendingFileType.current = type;
+    if (fileInputRef.current) {
+      switch (type) {
+        case 'image':
+          fileInputRef.current.accept = 'image/*';
+          break;
+        case 'drawio':
+          fileInputRef.current.accept = '.drawio,.xml';
+          break;
+        case 'docx':
+          fileInputRef.current.accept = '.docx,.doc';
+          break;
+      }
+      fileInputRef.current.click();
+    }
+  }, []);
+
+  const readFileAsDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('FileReader did not return a string.'));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const readFileAsText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('FileReader did not return a string.'));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  };
+
+  const onFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const type = pendingFileType.current;
+    const activeDocument = getActiveDocument();
+
+    try {
+      switch (type) {
+        case 'image': {
+          editor.dispatchCommand({
+            type: 'INSERT_IMAGE',
+            payload: { src: '', alt: file.name, assetId: undefined }
+          });
+
+          const dataUrl = await readFileAsDataURL(file);
+          let assetId: string | undefined;
+
+          if (backendUrl && token && activeDocument?.id) {
+            try {
+              const api = getApiService(backendUrl);
+              const asset = await api.uploadAsset(token, activeDocument.id, file);
+              assetId = asset.ID;
+            } catch (uploadError) {
+              console.warn('Asset upload failed, using inline data URL:', uploadError);
+            }
+          }
+
+          editor.dispatchCommand({
+            type: 'UPDATE_IMAGE',
+            payload: { src: dataUrl, alt: file.name, assetId }
+          });
+          break;
+        }
+        case 'drawio': {
+          if (!file.name.toLowerCase().endsWith('.drawio') && !file.name.toLowerCase().endsWith('.xml')) {
+            alert('Please select a valid .drawio file');
+            return;
+          }
+
+          editor.dispatchCommand({
+            type: 'INSERT_DRAWIO',
+            payload: { diagramXML: '', assetId: undefined }
+          });
+
+          const xml = await readFileAsText(file);
+          let assetId: string | undefined;
+
+          if (backendUrl && token && activeDocument?.id) {
+            try {
+              const api = getApiService(backendUrl);
+              const asset = await api.uploadAsset(token, activeDocument.id, file);
+              assetId = asset.ID;
+            } catch (uploadError) {
+              console.warn('Asset upload failed, using inline XML:', uploadError);
+            }
+          }
+
+          editor.dispatchCommand({
+            type: 'UPDATE_DRAWIO',
+            payload: { diagramXML: xml, assetId }
+          });
+          break;
+        }
+        case 'docx': {
+          const mammoth = await import('mammoth');
+          const arrayBuffer = await file.arrayBuffer();
+          const result = await mammoth.convertToHtml({ arrayBuffer });
+          const html = result.value;
+
+          if (html) {
+            editor.dispatchCommand({
+              type: 'INSERT_HTML',
+              payload: { html }
+            });
+          }
+          break;
+        }
+      }
+    } catch (error) {
+      console.error('Error processing file:', error);
+      alert('Error processing file. Please try again.');
+    }
+
+    e.target.value = '';
+    pendingFileType.current = null;
+  }, [editor, backendUrl, token, getActiveDocument]);
+
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        style={{ display: 'none' }}
+        onChange={onFileSelected}
+      />
+      <div className={styles.toolbar}>
         <button
           disabled={!state.canUndo}
           onClick={() => editor.dispatchCommand({ type: 'UNDO' })}
@@ -225,12 +402,6 @@ export default function ToolbarPlugin() {
         >
           <Undo size={16} />
         </button>
-      ),
-    },
-    {
-      id: 'redo',
-      group: 'History',
-      component: (
         <button
           disabled={!state.canRedo}
           onClick={() => editor.dispatchCommand({ type: 'REDO' })}
@@ -239,15 +410,9 @@ export default function ToolbarPlugin() {
         >
           <Redo size={16} />
         </button>
-      ),
-    },
-    { id: 'divider-1', type: 'divider' },
-    { id: 'block-format', group: 'Text Style', component: <BlockFormatDropDown /> },
-    { id: 'divider-2', type: 'divider' },
-    {
-      id: 'bold',
-      group: 'Formatting',
-      component: (
+
+        <BlockFormatDropDown />
+
         <button
           onClick={() => editor.dispatchCommand({ type: 'FORMAT_TEXT', payload: { format: 'bold' } })}
           className={`${styles.button} ${state.isBold ? styles.active : ''}`}
@@ -255,12 +420,6 @@ export default function ToolbarPlugin() {
         >
           <Bold size={16} />
         </button>
-      ),
-    },
-    {
-      id: 'italic',
-      group: 'Formatting',
-      component: (
         <button
           onClick={() => editor.dispatchCommand({ type: 'FORMAT_TEXT', payload: { format: 'italic' } })}
           className={`${styles.button} ${state.isItalic ? styles.active : ''}`}
@@ -268,12 +427,6 @@ export default function ToolbarPlugin() {
         >
           <Italic size={16} />
         </button>
-      ),
-    },
-    {
-      id: 'underline',
-      group: 'Formatting',
-      component: (
         <button
           onClick={() => editor.dispatchCommand({ type: 'FORMAT_TEXT', payload: { format: 'underline' } })}
           className={`${styles.button} ${state.isUnderline ? styles.active : ''}`}
@@ -281,12 +434,6 @@ export default function ToolbarPlugin() {
         >
           <Underline size={16} />
         </button>
-      ),
-    },
-    {
-      id: 'strikethrough',
-      group: 'Formatting',
-      component: (
         <button
           onClick={() => editor.dispatchCommand({ type: 'FORMAT_TEXT', payload: { format: 'strikethrough' } })}
           className={`${styles.button} ${state.isStrikethrough ? styles.active : ''}`}
@@ -294,26 +441,14 @@ export default function ToolbarPlugin() {
         >
           <Strikethrough size={16} />
         </button>
-      ),
-    },
-    {
-      id: 'code',
-      group: 'Formatting',
-      component: (
         <button
           onClick={() => editor.dispatchCommand({ type: 'FORMAT_TEXT', payload: { format: 'code' } })}
           className={`${styles.button} ${state.isCode ? styles.active : ''}`}
-          title="Code"
+          title="Inline Code"
         >
           <Code size={16} />
         </button>
-      ),
-    },
-    { id: 'divider-3', type: 'divider' },
-    {
-      id: 'ul',
-      group: 'Lists',
-      component: (
+
         <button
           onClick={() => editor.dispatchCommand({ type: 'TOGGLE_LIST', payload: { listType: 'bullet' } })}
           className={styles.button}
@@ -321,12 +456,6 @@ export default function ToolbarPlugin() {
         >
           <List size={16} />
         </button>
-      ),
-    },
-    {
-      id: 'ol',
-      group: 'Lists',
-      component: (
         <button
           onClick={() => editor.dispatchCommand({ type: 'TOGGLE_LIST', payload: { listType: 'number' } })}
           className={styles.button}
@@ -334,71 +463,15 @@ export default function ToolbarPlugin() {
         >
           <ListOrdered size={16} />
         </button>
-      ),
-    },
-    {
-      id: 'quote',
-      group: 'Lists',
-      component: (
-        <button
-          onClick={() => editor.dispatchCommand({ type: 'SET_BLOCK_TYPE', payload: { blockType: 'quote' } })}
-          className={styles.button}
-          title="Quote"
-        >
-          <Quote size={16} />
-        </button>
-      ),
-    },
-    { id: 'divider-4', type: 'divider' },
-    { id: 'admonition', group: 'Callouts', component: <AdmonitionDropDown /> },
-  ];
 
-  const getGroupedHiddenTools = () => {
-    const hiddenTools = tools.filter((t) => hiddenIds.includes(t.id) && t.type !== 'divider');
-    const groups: Record<string, ToolItem[]> = {};
+        <InsertDropDown
+          onInsertImage={() => handleFileUpload('image')}
+          onInsertDrawio={() => handleFileUpload('drawio')}
+          onInsertDocx={() => handleFileUpload('docx')}
+        />
 
-    hiddenTools.forEach((tool) => {
-      const groupName = tool.group || 'Other';
-      if (!groups[groupName]) {
-        groups[groupName] = [];
-      }
-      groups[groupName].push(tool);
-    });
-
-    return Object.entries(groups);
-  };
-
-  return (
-    <div className={styles.toolbarContainer}>
-      <div className={styles.scrollableToolbar}>
-        {tools.map((tool) => (
-          <ResponsiveItem key={tool.id} id={tool.id} setHiddenIds={setHiddenIds}>
-            {tool.type === 'divider' ? <div className={styles.divider} /> : tool.component}
-          </ResponsiveItem>
-        ))}
+        <AdmonitionDropDown />
       </div>
-
-      {hiddenIds.length > 0 && (
-        <div className={styles.hamburgerContainer} ref={hamburgerRef}>
-          <button className={styles.button} onClick={() => setShowHamburger((v) => !v)}>
-            <MoreHorizontal size={16} />
-          </button>
-          {showHamburger && (
-            <div className={styles.hamburgerDropdown}>
-              {getGroupedHiddenTools().map(([groupName, groupTools]) => (
-                <div key={groupName} className={styles.menuGroup}>
-                  <div className={styles.menuHeader}>{groupName}</div>
-                  <div className={styles.menuRow}>
-                    {groupTools.map((tool) => (
-                      <React.Fragment key={tool.id}>{tool.component}</React.Fragment>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    </>
   );
 }

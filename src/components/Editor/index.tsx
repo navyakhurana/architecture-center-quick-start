@@ -27,6 +27,7 @@ import LoadingModal, { PublishStage } from '../LoadingModal';
 import ArticleHeader from '../ArticleHeader';
 import Breadcrumbs from '../Breadcrumbs';
 import ContributorsDisplay from '../ContributorsDisplay';
+import { Eye } from 'lucide-react';
 
 const findRootDocument = (startDocId: string, allDocs: Document[]): Document | null => {
   let currentDoc = allDocs.find((d) => d.id === startDocId);
@@ -608,9 +609,11 @@ const Editor: React.FC<EditorProps> = ({ onAddNew, onEditMeta }) => {
                   tooltip="Learn more about contributing"
                 ></Button>
                 {isReadOnly && (
-                  <span className={styles.saveTimestamp} style={{ color: '#f59e0b' }}>
-                    View Only - You are a contributor
-                  </span>
+                  <div className={styles.viewOnlyBanner}>
+                    <Eye size={16} className={styles.viewOnlyIcon} />
+                    <span className={styles.viewOnlyText}>View Only</span>
+                    <span className={styles.viewOnlySubtext}>Only the author can make changes</span>
+                  </div>
                 )}
                 {!isReadOnly && (
                   <span className={styles.saveTimestamp}>

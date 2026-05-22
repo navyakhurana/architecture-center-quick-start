@@ -29,11 +29,14 @@ export default function MediaLoadingPlugin() {
       rootsRef.current.set(element, root);
     });
 
-    // Clean up removed placeholders
+    // Clean up removed placeholders - defer unmount to avoid React race condition
     rootsRef.current.forEach((root, element) => {
       if (!currentElements.has(element)) {
-        root.unmount();
         rootsRef.current.delete(element);
+        // Defer unmount to next tick to avoid "unmount during render" warning
+        setTimeout(() => {
+          root.unmount();
+        }, 0);
       }
     });
   }, [core]);
@@ -71,9 +74,12 @@ export default function MediaLoadingPlugin() {
 
     return () => {
       observer.disconnect();
-      // Cleanup all roots
-      rootsRef.current.forEach((root) => root.unmount());
+      // Cleanup all roots - defer to avoid React race condition
+      const roots = Array.from(rootsRef.current.values());
       rootsRef.current.clear();
+      setTimeout(() => {
+        roots.forEach((root) => root.unmount());
+      }, 0);
     };
   }, [core, updatePlaceholders]);
 

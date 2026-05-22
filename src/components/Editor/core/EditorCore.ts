@@ -250,10 +250,22 @@ export class EditorCore {
     const allBlocks = this.container.querySelectorAll('.editorUnsyncedBlock');
     allBlocks.forEach(block => block.classList.remove('editorUnsyncedBlock'));
 
-    // Add indicator to unsynced blocks
+    // Add indicator to unsynced blocks - find block-level ancestor for each key
     unsyncedKeys.forEach(key => {
-      const element = this.container?.querySelector(`[data-editor-key="${key}"]`);
+      // First try to find the element directly
+      let element = this.container?.querySelector(`[data-editor-key="${key}"]`);
+
+      // If found, check if it's a block-level element, otherwise find its block parent
       if (element) {
+        // Check if this is an inline element (link, etc.) and find parent block
+        const tagName = element.tagName.toLowerCase();
+        if (tagName === 'a' || tagName === 'span' || tagName === 'code' || tagName === 'strong' || tagName === 'em') {
+          // Find the closest block-level parent with data-editor-key
+          const blockParent = element.closest('p[data-editor-key], h1[data-editor-key], h2[data-editor-key], h3[data-editor-key], h4[data-editor-key], h5[data-editor-key], h6[data-editor-key], li[data-editor-key], blockquote[data-editor-key], pre[data-editor-key], div[data-editor-key]');
+          if (blockParent) {
+            element = blockParent;
+          }
+        }
         element.classList.add('editorUnsyncedBlock');
       }
     });
@@ -2571,6 +2583,10 @@ export class EditorCore {
   private insertImage(src: string, alt: string, assetId?: string): void {
     if (!this.selection) return;
 
+    // Prevent inserting images inside admonitions
+    const existingAdmonition = this.getAdmonitionAncestor();
+    if (existingAdmonition) return;
+
     const block = getBlockAncestor(this.state, this.selection.anchor.key);
     if (!block || !block.parent) return;
 
@@ -2653,6 +2669,10 @@ export class EditorCore {
 
   private insertAdmonition(admonitionType: AdmonitionType): void {
     if (!this.selection) return;
+
+    // Prevent nesting admonitions inside admonitions
+    const existingAdmonition = this.getAdmonitionAncestor();
+    if (existingAdmonition) return;
 
     const block = getBlockAncestor(this.state, this.selection.anchor.key);
     if (!block || !block.parent) return;
@@ -3059,6 +3079,10 @@ export class EditorCore {
   private insertDrawio(diagramXML: string, assetId?: string): void {
     if (!this.selection) return;
 
+    // Prevent inserting diagrams inside admonitions
+    const existingAdmonition = this.getAdmonitionAncestor();
+    if (existingAdmonition) return;
+
     const block = getBlockAncestor(this.state, this.selection.anchor.key);
     if (!block || !block.parent) return;
 
@@ -3307,6 +3331,10 @@ export class EditorCore {
 
   private insertTable(rows: number, cols: number): void {
     if (!this.selection) return;
+
+    // Prevent inserting tables inside admonitions
+    const existingAdmonition = this.getAdmonitionAncestor();
+    if (existingAdmonition) return;
 
     const block = getBlockAncestor(this.state, this.selection.anchor.key);
     if (!block || !block.parent) return;

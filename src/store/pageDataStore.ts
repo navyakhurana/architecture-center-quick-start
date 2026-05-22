@@ -329,7 +329,15 @@ export const usePageDataStore = create<PageDataState>()(
 
                     set({
                         documents: mergedDocuments,
-                        activeDocumentId: mergedDocuments.length > 0 ? mergedDocuments[0].id : null,
+                        activeDocumentId: (() => {
+                            // Prioritize "My Documents" (non-read-only) over "Shared with me" (read-only)
+                            const myDocs = mergedDocuments.filter(d => d.parentId === null && !d.isReadOnly);
+                            if (myDocs.length > 0) return myDocs[0].id;
+                            // Fallback to shared documents if no owned documents
+                            const sharedDocs = mergedDocuments.filter(d => d.parentId === null && d.isReadOnly);
+                            if (sharedDocs.length > 0) return sharedDocs[0].id;
+                            return mergedDocuments.length > 0 ? mergedDocuments[0].id : null;
+                        })(),
                         openDocumentIds: mergedDocuments.filter(d => d.parentId === null).slice(0, 1).map(d => d.id),
                         isLoading: false,
                         lastSaveTimestamp: data.value?.[0]?.modifiedAt || data.value?.[0]?.createdAt || new Date().toISOString(),
